@@ -11,5 +11,3 @@
 6. Troubleshooting: Information on troubleshooting common issues is provided.
 
 7. Technical data: Detailed technical specifications are given.
-
-This summary provides an overview of the different sections covered in the technical description of the Roof-top air conditioner 680, allowing for further analysis using a topic modeling algorithm.
