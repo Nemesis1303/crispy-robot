@@ -1,3 +1,5 @@
+#https://github.com/g-stavrakis/PDF_Text_Extraction/tree/main
+#https://medium.com/@hussainshahbazkhawaja/paper-implementation-header-and-footer-extraction-by-page-association-3a499b2552ae
 import json
 import logging
 import os
