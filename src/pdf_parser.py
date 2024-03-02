@@ -194,48 +194,6 @@ class PDFParser(object):
 
         return table
 
-    def _describe_table(
-        self,
-        table: pd.DataFrame
-    ) -> str:
-        """Describe the table given by table.
-
-        Parameters
-        ----------
-        table : pd.DataFrame
-            The table to describe
-
-        Returns
-        -------
-        str
-            The description of the table
-        """
-
-        parameters = {
-            "model": "gpt-4",
-            "messages": [
-                {"role": "system", "content": f"You are a helpful assistant trained on the task of describing in natural language the content of a table given in DataFrame format."
-                 },
-            ],
-            "temperature": 0.2,
-            "max_tokens": 1000,
-            "frequency_penalty": 0.0
-        }
-
-        parser = OpenAI(api_key=self._api_key)
-
-        gpt_prompt = f"Give a description for the following table: {table}"
-
-        message = [{"role": "user", "content": gpt_prompt}]
-        parameters["messages"] = [parameters["messages"][0], *message]
-
-        response = parser.chat.completions.create(
-            **parameters
-        )
-        description = response.choices[0].message.content
-
-        return description
-
     def _get_label_table(
         self,
         table: pd.DataFrame
@@ -281,7 +239,8 @@ class PDFParser(object):
     def _table_converter(
         self,
         table,
-        pageNr
+        pageNr,
+        path_save
     ) -> str:
         """Convert the table given by table into a string.
 
@@ -382,8 +341,8 @@ class PDFParser(object):
                 # Convert to dataframe an save as csv/excel
                 df_table = pd.DataFrame(cleaned_table)
                 label = self._get_label_table(df_table)
-                description = None  # self._describe_table(df_table)
-                table_output_save = f"/Users/lbartolome/Documents/GitHub/crispy-robot/data/tables/page_{pageNr}_{label}.xlsx"
+                description = None
+                table_output_save = f"{path_save.as_posix()}/tables/page_{pageNr}_{label}.xlsx"
                 df_table.to_excel(table_output_save)
             else:
                 return None, None, None
@@ -452,7 +411,13 @@ class PDFParser(object):
                 return i  # Return the index of the table
         return None
 
-    def _extract_image(self, element, pageObj, pageNr, table_info=None):
+    def _extract_image(
+        self,
+        element,
+        pageObj,
+        pageNr,
+        path_save,
+        table_info=None):
         """Extract the image given by element from the page given by pageObj from the pdf given by pdf_path. Generate a textual description of the image and save it with a label.
 
         Parameters
@@ -483,13 +448,13 @@ class PDFParser(object):
         cropped_pdf_writer.add_page(pageObj)
 
         # Save the cropped PDF to a new file
-        pdf_image_save = '/Users/lbartolome/Documents/GitHub/crispy-robot/data/cropped_image.pdf'
+        pdf_image_save = path_save / "cropped_image.pdf"
         with open(pdf_image_save, "wb") as cropped_pdf_file:
             cropped_pdf_writer.write(cropped_pdf_file)
 
         # Temporarily convert the PDF and save as image
         images = convert_from_path(pdf_image_save)
-        output_file = "/Users/lbartolome/Documents/GitHub/crispy-robot/data/images/cropped_image.png"
+        output_file = path_save / "images" / "cropped_image.png"
         images[0].save(output_file, 'PNG')
 
         self._logger.info(
@@ -514,9 +479,9 @@ class PDFParser(object):
 
         # Save the image with name "page_{pageNr}_{label}.png"
         if table_info:
-            new_output_file = f"/Users/lbartolome/Documents/GitHub/crispy-robot/data/images/{label}.png"
+            new_output_file = f"{path_save.as_posix()}/images/{label}.png"
         else:
-            new_output_file = f"/Users/lbartolome/Documents/GitHub/crispy-robot/data/images/page_{pageNr}_{label}.png"
+            new_output_file = f"{path_save.as_posix()}/images/page_{pageNr}_{label}.png"
 
         images[0].save(new_output_file, 'PNG')
 
@@ -547,9 +512,10 @@ class PDFParser(object):
         }
         return document_json
 
-    def parser(
+    def parse(
         self,
-        pdf_path: pathlib.Path
+        pdf_path: pathlib.Path,
+        path_save: pathlib.Path
     ) -> dict:
 
         # Extract the header and footer from the PDF
@@ -617,7 +583,7 @@ class PDFParser(object):
 
                 # Convert the table information in structured string format, save the table as image and get the description
                 table_string, table_output_save, description = \
-                    self._table_converter(table, pagenum)
+                    self._table_converter(table, pagenum, path_save)
 
                 # TODO: Can be NONE
                 # Append the table string, the path to the table image and the description to their corresponding lists
@@ -678,8 +644,9 @@ class PDFParser(object):
                                 table_label = f"in_table_{pathlib.Path(path_tables[table_idx]).stem}"
 
                             # Extract the image and its description
-                            image_path, description, label = self._extract_image(
-                                element, pageObj, pagenum, table_label)
+                            image_path, description, label = \
+                                self._extract_image(
+                                element, pageObj, pagenum, path_save, table_label)
 
                             if "logo" in label:
                                 os.remove(image_path)
@@ -707,7 +674,7 @@ class PDFParser(object):
 
                         # Extract the image and its description
                         image_path, description, _ = self._extract_image(
-                            element, pageObj, pagenum)
+                            element, pageObj, pagenum, path_save)
 
                         # Append the image and its description to the content
                         this_page_content.append(
@@ -763,7 +730,7 @@ class PDFParser(object):
             )
 
         document_json = self._generate_json(content_per_page)
-        with open(f"/Users/lbartolome/Documents/GitHub/crispy-robot/data/{pdf_path.stem}.json", "w", encoding="utf-8") as json_file:
+        with open(f"{path_save.as_posix()}{pdf_path.stem}.json", "w", encoding="utf-8") as json_file:
             json.dump(document_json, json_file, indent=2, ensure_ascii=False)
 
         return
