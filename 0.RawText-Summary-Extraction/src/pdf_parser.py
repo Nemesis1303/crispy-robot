@@ -1,11 +1,22 @@
-#https://github.com/g-stavrakis/PDF_Text_Extraction/tree/main
-#https://medium.com/@hussainshahbazkhawaja/paper-implementation-header-and-footer-extraction-by-page-association-3a499b2552ae
+"""
+Class for parsing PDF files. It extracts the text, tables, and images from the PDF and generates a JSON file with the extracted content. It also generates a description for the images and tables in the PDF, if specified.
+
+The code is based on the following sources:
+* https://github.com/g-stavrakis/PDF_Text_Extraction/tree/main for the text / tables / images extraction
+* https://medium.com/@hussainshahbazkhawaja/paper-implementation-header-and-footer-extraction-by-page-association-3a499b2552ae for the header / footer extraction mechanism
+
+Author: Lorena Calvo-Bartolomé
+Date: 04/02/2024
+"""
+
 import json
 import logging
 import os
 import pathlib
 import re
 import time
+from typing import Tuple
+from dotenv import load_dotenv
 
 import fitz
 import pandas as pd
@@ -17,8 +28,7 @@ from langchain_community.document_loaders import PyMuPDFLoader
 from openai import OpenAI
 from pdf2image import convert_from_path
 from pdfminer.high_level import extract_pages
-from pdfminer.layout import LTFigure
-from PIL import Image
+from pdfminer.layout import LTFigure, LTTextContainer, LTPage
 from tqdm import tqdm
 
 from src.image_descriptor import ImageDescriptor
@@ -26,15 +36,75 @@ from src.utils import compare
 
 
 class PDFParser(object):
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        generate_img_desc: bool = False,
+        generate_table_desc: bool = False,
+        header_weights: list = [1.0, 0.75, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+        footer_weights: list = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.75, 1.0],
+        win: int = 8
+    ) -> None:
+        """
+        Initialize the PDFParser object.
 
-        self._image_descriptor = ImageDescriptor()
-        self._api_key = os.environ['OPENAI_API_KEY']
+        Parameters
+        ----------
+        generate_img_desc : bool, optional
+            Whether to generate a description for the images in the PDF, by default False
+        generate_table_desc : bool, optional
+            Whether to generate a description for the tables in the PDF, by default False
+        header_weights : list, optional
+            The weights for the header, by default [1.0, 0.75, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+        footer_weights : list, optional
+            The weights for the footer, by default [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.75, 1.0]
+        win : int, optional
+            Parameter to control the number of neighboring pages in the header / footer extraction mechanism by default 8
+        """
 
+        # Create a logger
         logging.basicConfig(level='INFO')
-        self._logger = logging.getLogger('PDFParser')
+        self._logger = logging.getLogger(__name__)
 
-    def _extract_text_from_page(self, page):
+        # Get OpenAI API key from .env file
+        path_env = pathlib.Path(os.getcwd()).parent / '.env'
+        load_dotenv(path_env)
+        self._api_key = os.getenv("OPENAI_API_KEY")
+
+        # Initialize image descriptor if generate_img_desc is True
+        if generate_img_desc:
+            self._image_descriptor = ImageDescriptor()
+            self._logger.info(
+                f"-- -- Image descriptor initialized with OpenAI API key."
+            )
+
+        # Initialize the variables
+        self._generate_img_desc = generate_img_desc
+        self._generate_table_desc = generate_table_desc
+        self._header_weights = header_weights
+        self._footer_weights = footer_weights
+        self._win = win
+        self._table_counter = 0
+        self._img_counter = 0
+
+    # ======================================================
+    # HEADER / FOOTER EXTRACTION
+    # ======================================================
+    def _extract_text_from_page(
+        self,
+        page
+    ) -> list:
+        """Extract the text from the page given by page for the header / footer extraction.
+
+        Parameters
+        ----------
+        page : fitz.fitz.Page
+            The page to extract the text from
+
+        Returns
+        -------
+        list
+            The text extracted from the page
+        """
 
         text = page.get_text(sort=True)
         text = text.split('\n')
@@ -42,13 +112,32 @@ class PDFParser(object):
 
         return text
 
-    def _extract_header(self, header_candidates, WIN):
+    def _extract_header(
+        self,
+        header_candidates: list
+    ):
+        """Extract the header from the header_candidates.
 
-        header_weights = [1.0, 0.75, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+        Parameters
+        ----------
+        header_candidates : list
+            The list of header candidates
+
+        Returns
+        -------
+        list
+            The extracted header
+        """
+
+        self._logger.info(
+            f"-- Extracting header from header candidates...")
+
         all_detected = []
         for i, candidate in enumerate(header_candidates):
             temp = header_candidates[max(
-                i-WIN, 1): min(i+WIN, len(header_candidates))]
+                i-self._win, 1): min(i+self._win, len(header_candidates))]
+            if temp == []:  # Consider pdf with only one page
+                temp = header_candidates
             maxlen = len(max(temp, key=len))
             for sublist in temp:
                 sublist[:] = sublist + [''] * (maxlen - len(sublist))
@@ -58,10 +147,10 @@ class PDFParser(object):
                 try:
                     cmp = list(list(zip(*temp))[j])
                     for cm in cmp:
-                        score += compare(cn, cm) * header_weights[j]
+                        score += compare(cn, cm) * self._header_weights[j]
                     score = score/len(cmp)
                 except:
-                    score = header_weights[j]
+                    score = self._header_weights[j]
                 if score > 0.5:
                     detected.append(cn)
             del temp
@@ -72,14 +161,33 @@ class PDFParser(object):
 
         return detected
 
-    def _extract_footer(self, footer_candidates, WIN):
+    def _extract_footer(
+        self,
+        footer_candidates: list
+    ) -> list:
+        """
+        Extract the footer from the footer_candidates.
 
-        footer_weights = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.75, 1.0]
+        Parameters
+        ----------
+        footer_candidates : list
+            The list of footer candidates
+
+        Returns
+        -------
+        list
+            The extracted footer
+        """
+
+        self._logger.info(
+            f"-- Extracting footer from footer candidates...")
 
         all_detected = []
         for i, candidate in enumerate(footer_candidates):
             temp = footer_candidates[max(
-                i-WIN, 1): min(i+WIN, len(footer_candidates))]
+                i-self._win, 1): min(i+self._win, len(footer_candidates))]
+            if temp == []:  # Consider pdf with only one page
+                temp = footer_candidates
             maxlen = len(max(temp, key=len))
             for sublist in temp:
                 sublist[:] = [''] * (maxlen - len(sublist)) + sublist
@@ -92,7 +200,7 @@ class PDFParser(object):
                         score += compare(cn, cm)
                     score = score/len(cmp)
                 except:
-                    score = footer_weights[j]
+                    score = self._footer_weights[j]
                 if score > 0.5:
                     detected.append(cn)
             del temp
@@ -103,9 +211,12 @@ class PDFParser(object):
 
         return detected
 
+    # ======================================================
+    # TEXT / TABLE / IMAGE EXTRACTION
+    # ======================================================
     def _parse_text(
         self,
-        text
+        text: str
     ) -> str:
         """
         Parse the text extracted from the PDF in order to make it more readable.
@@ -127,7 +238,7 @@ class PDFParser(object):
 
     def _extract_text(
         self,
-        element
+        element: LTTextContainer
     ) -> str:
         """Extract text from a single element and parse it.
 
@@ -147,10 +258,6 @@ class PDFParser(object):
         if extracted_text is None or not bool(extracted_text.strip()):
             return ""
 
-        # self._logger.info(
-        #    f"-- Waiting 3 minutes to avoid OpenAI API rate limit...")
-        # time.sleep(60)
-
         parse_text = self._parse_text(extracted_text)
 
         for el in self._header + self._footer:
@@ -164,9 +271,9 @@ class PDFParser(object):
 
     def _extract_table(
         self,
-        pdf_path,
-        page_num,
-        table_num
+        pdf_path: str,
+        page_num: int,
+        table_num: int
     ) -> list:
         """Extract the table given by table_num from the page given by page_num from the pdf given by pdf_path.
 
@@ -238,9 +345,9 @@ class PDFParser(object):
 
     def _table_converter(
         self,
-        table,
-        pageNr,
-        path_save
+        table: list,
+        pageNr: int,
+        path_save: pathlib.Path
     ) -> str:
         """Convert the table given by table into a string.
 
@@ -325,7 +432,7 @@ class PDFParser(object):
                 table_string = table_string.replace(el, "")
 
             table_string = self._parse_text(table_string)
-            
+
             for row in cleaned_table[:]:
                 remove_row = False
                 for el_hf in self._header + self._footer:
@@ -340,7 +447,13 @@ class PDFParser(object):
             if len(cleaned_table) > 1:
                 # Convert to dataframe an save as csv/excel
                 df_table = pd.DataFrame(cleaned_table)
-                label = self._get_label_table(df_table)
+
+                # Generate a label to save the table if generate_table_desc is True; otherwise, use a counter
+                if self._generate_table_desc:
+                    label = self._get_label_table(df_table)
+                else:
+                    label = str(self._table_counter)
+                    self._table_counter += 1
                 description = None
                 table_output_save = f"{path_save.as_posix()}/tables/page_{pageNr}_{label}.xlsx"
                 df_table.to_excel(table_output_save)
@@ -351,9 +464,9 @@ class PDFParser(object):
 
     def _is_text_element_inside_any_table(
         self,
-        element,
-        page,
-        tables
+        element: LTTextContainer,
+        page: LTPage,
+        tables: list
     ) -> bool:
         """
         Check if the element is in any tables present in the page.
@@ -362,7 +475,7 @@ class PDFParser(object):
         ----------
         element : LTTextContainer
             The element to check
-        page : pdfminer.layout.LTPage
+        page : LTPage
             The page the element is on
         tables : list
             The list of tables on the page
@@ -385,9 +498,9 @@ class PDFParser(object):
 
     def _find_table_for_element(
         self,
-        element,
-        page,
-        tables
+        element: LTTextContainer,
+        page: LTPage,
+        tables: list
     ) -> int:
         """Find the table for a given element. If the element is not inside any table, return None.
 
@@ -395,7 +508,7 @@ class PDFParser(object):
         ----------
         element : LTTextContainer
             The element to find the table for
-        page : pdfminer.layout.LTPage
+        page : LTPage
             The page the element is on
         tables : list
             The list of tables on the page
@@ -413,28 +526,29 @@ class PDFParser(object):
 
     def _extract_image(
         self,
-        element,
-        pageObj,
-        pageNr,
-        path_save,
-        table_info=None):
+        element: LTFigure,
+        pageObj: LTPage,
+        pageNr: int,
+        path_save: pathlib.Path,
+        table_info: str = None
+    ) -> Tuple[str, str, str]:
         """Extract the image given by element from the page given by pageObj from the pdf given by pdf_path. Generate a textual description of the image and save it with a label.
 
         Parameters
         ----------
         element : LTImage
             The image to extract from the page
-        pageObj : pdfminer.layout.LTPage
+        pageObj : LTPage
             The page to extract the image from
         pageNr : int
             The page number of the page to extract the image from
+        table_info : str, optional
+            The information of the table the image is in, by default None
 
         Returns
         -------
-        str
-            The path to the image
-        str
-            The textual description of the image
+        Tuple[str, str, str]
+            The path to the image, the textual description of the image, and the label of the image
         """
 
         # Get the coordinates to crop the image from PDF
@@ -457,28 +571,33 @@ class PDFParser(object):
         output_file = path_save / "images" / "cropped_image.png"
         images[0].save(output_file, 'PNG')
 
-        self._logger.info(
-            f"-- Waiting 3 minutes to avoid OpenAI API rate limit...")
-        time.sleep(60*3)
         # Get the a textual label to save the image
-        label = self._image_descriptor.get_label_image(
-            pathlib.Path(output_file))
-
-        if table_info:
-            label = f"{table_info}_{label}"
-
-        if not "logo" in label:
+        if self._generate_img_desc:
             self._logger.info(
                 f"-- Waiting 3 minutes to avoid OpenAI API rate limit...")
             time.sleep(60*3)
-            # Get the textual description of the image
-            description = self._image_descriptor.describe_image(
+            # Get the a textual label to save the image
+            label = self._image_descriptor.get_label_image(
                 pathlib.Path(output_file))
+
+            if not "logo" in label:
+                # If the label is not "logo" (the image does not represent a logo according to gpt-4), get the textual description of the image
+                self._logger.info(
+                    f"-- Waiting 3 minutes to avoid OpenAI API rate limit...")
+                time.sleep(60*3)
+                description = self._image_descriptor.describe_image(
+                    pathlib.Path(output_file))
+            else:
+                description = "logo"
         else:
-            description = "logo"
+            description = None
+            label = str(self._img_counter)
+            self._img_counter += 1
 
         # Save the image with name "page_{pageNr}_{label}.png"
         if table_info:
+            # If the image is inside a table, add the table information to the label
+            label = f"{table_info}_{label}"
             new_output_file = f"{path_save.as_posix()}/images/{label}.png"
         else:
             new_output_file = f"{path_save.as_posix()}/images/page_{pageNr}_{label}.png"
@@ -491,7 +610,22 @@ class PDFParser(object):
 
         return new_output_file, description, label
 
-    def _get_metadata(self, pdf_path):
+    def _get_metadata(
+        self,
+        pdf_path: pathlib.Path
+    ) -> dict:
+        """Get the metadata of the PDF given by pdf_path.
+
+        Parameters
+        ----------
+        pdf_path : pathlib.Path
+            The path to the PDF file
+
+        Returns
+        -------
+        dict
+            The metadata of the PDF
+        """
 
         loader = PyMuPDFLoader(pdf_path.as_posix())
 
@@ -503,7 +637,22 @@ class PDFParser(object):
         langchain_docs2 = loader.load_and_split(text_splitter)
         return langchain_docs2[0].metadata
 
-    def _generate_json(self, content_per_page):
+    def _generate_json(
+        self,
+        content_per_page: list
+    ) -> dict:
+        """Generate a JSON file with the extracted content from the PDF.
+
+        Parameters
+        ----------
+        content_per_page : list
+            The content extracted from each page of the PDF
+
+        Returns
+        -------
+        dict
+            The JSON file with the extracted content
+        """
         document_json = {
             "metadata": self._metadata,
             "header": " ".join(self._header),
@@ -517,8 +666,25 @@ class PDFParser(object):
         pdf_path: pathlib.Path,
         path_save: pathlib.Path
     ) -> dict:
+        """
+        Parse the PDF given by pdf_path and save the extracted content in a JSON file.
 
+        Parameters
+        ----------
+        pdf_path : pathlib.Path
+            The path to the PDF file
+        path_save : pathlib.Path
+            The path to save the extracted content
+
+        Returns
+        -------
+        dict
+            The JSON file with the extracted content 
+        """
+
+        ########################################################################
         # Extract the header and footer from the PDF
+        ########################################################################
         pages = fitz.open(pdf_path)
         pages = [self._extract_text_from_page(page) for page in pages]
 
@@ -529,12 +695,17 @@ class PDFParser(object):
             header_candidates.append(page[:8])
             footer_candidates.append(page[-8:])
 
-        WIN = 8
+        self._header = self._extract_header(header_candidates)
+        self._footer = self._extract_footer(footer_candidates)
 
-        self._header = self._extract_header(header_candidates, WIN)
-        self._footer = self._extract_footer(footer_candidates, WIN)
+        ########################################################################
+        # Extract metadata
+        ########################################################################
         self._metadata = self._get_metadata(pdf_path)
 
+        ########################################################################
+        # Extract the content from the PDF
+        ########################################################################
         # Create a PDF file object
         pdfFileObj = open(pdf_path, 'rb')
 
@@ -547,7 +718,12 @@ class PDFParser(object):
         # Initialize the number of the examined tables
         table_in_page = -1
 
+        # Iterate through each page of the PDF
         for pagenum, page in tqdm(enumerate(extract_pages(pdf_path))):
+
+            # Reset the table and image counters at the beginning of each page
+            self._table_counter = 0
+            self._img_counter = 0
 
             last_element_type = None
             element_id = 0
@@ -585,8 +761,6 @@ class PDFParser(object):
                 table_string, table_output_save, description = \
                     self._table_converter(table, pagenum, path_save)
 
-                # TODO: Can be NONE
-                # Append the table string, the path to the table image and the description to their corresponding lists
                 text_from_tables.append(table_string)
                 path_tables.append(table_output_save)
                 description_tables.append(description)
@@ -603,7 +777,7 @@ class PDFParser(object):
                 f"-- Element extraction from page {pagenum} starts...")
 
             # Find the elements that compose a page
-            for i_element, component in tqdm(enumerate(page_elements)):
+            for _, component in tqdm(enumerate(page_elements)):
 
                 # Get the element
                 element = component[1]
@@ -646,7 +820,7 @@ class PDFParser(object):
                             # Extract the image and its description
                             image_path, description, label = \
                                 self._extract_image(
-                                element, pageObj, pagenum, path_save, table_label)
+                                    element, pageObj, pagenum, path_save, table_label)
 
                             if "logo" in label:
                                 os.remove(image_path)
@@ -691,9 +865,6 @@ class PDFParser(object):
                         element_id += 1
 
                     else:
-                        # Check if the element is text element
-                        # if isinstance(element, LTTextContainer) or isinstance(element, LTTextBoxHorizontal):
-
                         # Use the function to extract the text and format for each text element
                         try:
                             line_text = self._extract_text(element)
@@ -710,7 +881,7 @@ class PDFParser(object):
                                 # Append the text of each line to the page text
                                 this_page_content.append(
                                     {
-                                        "element_id": element_id,  # i_element,
+                                        "element_id": element_id,
                                         "element_type": "text",
                                         "element_content": line_text,
                                         "element_description": None,
@@ -730,7 +901,8 @@ class PDFParser(object):
             )
 
         document_json = self._generate_json(content_per_page)
-        with open(f"{path_save.as_posix()}{pdf_path.stem}.json", "w", encoding="utf-8") as json_file:
+        path_save_json = path_save / f"{pdf_path.stem}.json"
+        with open(path_save_json.as_posix(), "w", encoding="utf-8") as json_file:
             json.dump(document_json, json_file, indent=2, ensure_ascii=False)
 
         return

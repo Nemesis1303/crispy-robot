@@ -4,11 +4,15 @@ import requests
 import pathlib
 import backoff  # for exponential backoff
 import openai
+from dotenv import load_dotenv
 
 class ImageDescriptor(object):
     
     def __init__(self):
-        self._api_key = os.environ['OPENAI_API_KEY']
+        path_env = pathlib.Path(os.getcwd()).parent / '.env'
+        load_dotenv(path_env)
+        self._api_key = os.getenv("OPENAI_API_KEY")
+        #self._api_key = os.environ['OPENAI_API_KEY']
 
     def _encode_image(
         self,

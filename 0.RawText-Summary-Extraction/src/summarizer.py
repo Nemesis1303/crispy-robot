@@ -1,16 +1,13 @@
 import logging
 import os
 import pathlib
+from dotenv import load_dotenv
 from llama_index.llms.openai import OpenAI
 from  llama_index.core.schema import Document
 from llama_index.core import ServiceContext, get_response_synthesizer
-from llama_index.core import DocumentSummaryIndex
-from llama_index.core.indices.document_summary import (
-    DocumentSummaryIndexLLMRetriever,
-)
+from llama_index.core import DocumentSummaryIndex, VectorStoreIndex
 from langchain_community.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from llama_index.core.query_engine import RetrieverQueryEngine
 
 class Summarizer(object):
     def __init__(
@@ -18,7 +15,9 @@ class Summarizer(object):
         model="gpt-4"
     ) -> None:
         
-        self._api_key = os.environ['OPENAI_API_KEY']
+        path_env = pathlib.Path(os.getcwd()).parent / '.env'
+        load_dotenv(path_env)
+        self._api_key = os.getenv("OPENAI_API_KEY")
 
         logging.basicConfig(level='INFO')
         self._logger = logging.getLogger('PDFParser')
@@ -52,20 +51,6 @@ class Summarizer(object):
          
         return docs
     
-    def _build_llama_index(
-        self,
-        docs: list) -> None:
-        
-        # Create the index
-        doc_summary_index = DocumentSummaryIndex.from_documents(
-            docs,
-            service_context=self._service_context,
-            response_synthesizer=self._response_synthesizer,
-            show_progress=True,
-        )
-        
-        return doc_summary_index
-    
     def _save_results(
         self,
         index: DocumentSummaryIndex,
@@ -96,24 +81,9 @@ class Summarizer(object):
         docs = self._get_llama_docs(pdf_file)
         
         # Build Llama index
-        index = self._build_llama_index(docs)
+        index = VectorStoreIndex.from_documents(docs)
         
-        # Use LLM-powered retrieval vs Embedding-based retrieval (higher latency and cost but returns more relevant docs)
-        retriever = DocumentSummaryIndexLLMRetriever(
-            index,
-            # choice_select_prompt=None,
-            # choice_batch_size=10,
-            # choice_top_k=1,
-            # format_node_batch_fn=None,
-            # parse_choice_select_answer_fn=None,
-            # service_context=None
-        )
-        
-        # Assemble query engine
-        query_engine = RetrieverQueryEngine(
-            retriever=retriever,
-            response_synthesizer=self._response_synthesizer,
-        )
+        query_engine = index.as_query_engine()
 
         # Make query to obtain summary
         results = query_engine.query(instructions)
