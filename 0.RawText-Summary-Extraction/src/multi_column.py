@@ -1,4 +1,8 @@
 """
+--------------------------------------------------------------------
+Source: https://github.com/pymupdf/PyMuPDF-Utilities/blob/master/text-extraction/multi_column.py
+--------------------------------------------------------------------
+
 This is an advanced PyMuPDF utility for detecting multi-column pages.
 It can be used in a shell script, or its main function can be imported and
 invoked as descript below.

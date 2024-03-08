@@ -1,5 +1,39 @@
 """
-Class for parsing PDF files. It extracts the text, tables, and images from the PDF and generates a JSON file with the extracted content. It also generates a description for the images and tables in the PDF, if specified.
+Class for parsing PDF files. It extracts the text, tables, and images from the PDF and generates a JSON file with the extracted content. It also generates a description for the images and tables in the PDF, if specified. The extracted JSON structure is as follows:
+{
+    "metadata": {...},
+    "header": "...",
+    "footer": "...",
+    "pages": [
+        {
+            "page_number": 0,
+            "content": [
+                {
+                    "element_id": 0,
+                    "element_type": "text",
+                    "element_content": "...",
+                    "element_description": null,
+                    "element_path": null
+                },
+                {
+                    "element_id": 1,
+                    "element_type": "table",
+                    "element_content": "...",
+                    "element_description": null,
+                    "element_path": "path/to/table"
+                },
+                {
+                    "element_id": 2,
+                    "element_type": "image",
+                    "element_content": null,
+                    "element_description": "...",
+                    "element_path": "path/to/image"
+                }
+            ]
+        }
+    ]
+}
+Element 0 from each page is the text extracted from the page. Element 1 and onward are the tables and images extracted from the page, if any, maintaining the order they appear in the page. 
 
 The code is based on the following sources:
 * https://github.com/g-stavrakis/PDF_Text_Extraction/tree/main for the text / tables / images extraction
@@ -16,23 +50,23 @@ import pathlib
 import re
 import time
 from typing import Tuple
-from dotenv import load_dotenv
 
 import fitz
 import pandas as pd
 import pdfplumber
 import PyPDF2
+from dotenv import load_dotenv
 from fuzzywuzzy import fuzz
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyMuPDFLoader
 from openai import OpenAI
 from pdf2image import convert_from_path
 from pdfminer.high_level import extract_pages
-from pdfminer.layout import LTFigure, LTTextContainer, LTPage
-from tqdm import tqdm
-
+from pdfminer.layout import LTFigure, LTPage, LTTextContainer
 from src.image_descriptor import ImageDescriptor
+from src.multi_column import column_boxes
 from src.utils import compare
+from tqdm import tqdm
 
 
 class PDFParser(object):
@@ -42,7 +76,9 @@ class PDFParser(object):
         generate_table_desc: bool = False,
         header_weights: list = [1.0, 0.75, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
         footer_weights: list = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.75, 1.0],
-        win: int = 8
+        win: int = 8,
+        footer_marging: int = 50,
+        header_marging: int = 50
     ) -> None:
         """
         Initialize the PDFParser object.
@@ -59,6 +95,10 @@ class PDFParser(object):
             The weights for the footer, by default [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.75, 1.0]
         win : int, optional
             Parameter to control the number of neighboring pages in the header / footer extraction mechanism by default 8
+        footer_marging : int, optional
+            The margin to consider for the footer extraction when PyMuPDF's  multi_column.py utility is used, by default 50
+        header_marging : int, optional
+            The margin to consider for the header extraction when PyMuPDF's  multi_column.py utility is used, by default 50
         """
 
         # Create a logger
@@ -83,6 +123,8 @@ class PDFParser(object):
         self._header_weights = header_weights
         self._footer_weights = footer_weights
         self._win = win
+        self._footer_marging = footer_marging
+        self._header_marging = header_marging
         self._table_counter = 0
         self._img_counter = 0
 
@@ -234,40 +276,15 @@ class PDFParser(object):
 
         text_formatted = re.sub(' +', ' ', text).strip()
 
-        return text_formatted
-
-    def _extract_text(
-        self,
-        element: LTTextContainer
-    ) -> str:
-        """Extract text from a single element and parse it.
-
-        Parameters
-        ----------
-        element : LTTextContainer
-            The element to extract text from
-
-        Returns
-        -------
-        str
-            The formatted text extracted from the element
-        """
-
-        extracted_text = element.get_text()
-
-        if extracted_text is None or not bool(extracted_text.strip()):
-            return ""
-
-        parse_text = self._parse_text(extracted_text)
-
+        # Remove header and footer from the text
         for el in self._header + self._footer:
-            parse_text = parse_text.replace(
+            text = text.replace(
                 el, "").replace('-', '–').replace(el, "")
 
-        if parse_text == ".":
-            parse_text = ""
+        if text == ".":
+            text = ""
 
-        return parse_text
+        return text_formatted
 
     def _extract_table(
         self,
@@ -369,7 +386,7 @@ class PDFParser(object):
 
         def eliminate_patterns(text):
             """
-            Eliminate fixed patterns found in several utes (e.g., "ley" + month, "u.t.e." prefix/suffix, etc.)
+            Eliminate fixed patterns from the input string.
 
             Parameters
             ----------
@@ -683,28 +700,29 @@ class PDFParser(object):
         """
 
         ########################################################################
-        # Extract the header and footer from the PDF
-        ########################################################################
-        pages = fitz.open(pdf_path)
-        pages = [self._extract_text_from_page(page) for page in pages]
-
-        header_candidates = []
-        footer_candidates = []
-
-        for page in pages:
-            header_candidates.append(page[:8])
-            footer_candidates.append(page[-8:])
-
-        self._header = self._extract_header(header_candidates)
-        self._footer = self._extract_footer(footer_candidates)
-
-        ########################################################################
-        # Extract metadata
+        # 1. Extract metadata
+        # ----------------------------------------------------------------------
+        # This refers to the information about the PDF file, such as the title, author, subject, and keywords, that is stored in the document properties.
         ########################################################################
         self._metadata = self._get_metadata(pdf_path)
 
         ########################################################################
-        # Extract the content from the PDF
+        # 2. Extract the header and footer from the PDF
+        ########################################################################
+        # Open the PDF with PyMuPDF and extract the text from the pages
+        pages = fitz.open(pdf_path)
+        pages_ = [self._extract_text_from_page(page) for page in pages]
+
+        # Get the header and footer candidates
+        header_candidates = [page[:self._win] for page in pages_]
+        footer_candidates = [page[-self._win:] for page in pages_]
+
+        # Extract the header and footer from the header and footer candidates
+        self._header = self._extract_header(header_candidates)
+        self._footer = self._extract_footer(footer_candidates)
+
+        ########################################################################
+        # 3. Extract the content from the PDF
         ########################################################################
         # Create a PDF file object
         pdfFileObj = open(pdf_path, 'rb')
@@ -718,16 +736,17 @@ class PDFParser(object):
         # Initialize the number of the examined tables
         table_in_page = -1
 
-        # Iterate through each page of the PDF
-        for pagenum, page in tqdm(enumerate(extract_pages(pdf_path))):
+        # Iterate through each page. We keep objects from fitz and pypdf2 to extract so both content (including multicolumns) and tables/images can be extracted
+        for pagenum, (page_fitz, page_pypdf2) in enumerate(zip(pages, extract_pages(pdf_path))):
 
             # Reset the table and image counters at the beginning of each page
             self._table_counter = 0
             self._img_counter = 0
 
-            last_element_type = None
+            # Reset variable to store information about a page's elements
             element_id = 0
 
+            # Table extraction
             self._logger.info(
                 f"-- Table extraction from page {pagenum} starts...")
 
@@ -770,8 +789,36 @@ class PDFParser(object):
 
             # Find all the elements and sort them as they appear in the page
             page_elements = [(element.y1, element)
-                             for element in page._objs]
+                             for element in page_pypdf2._objs]
             page_elements.sort(key=lambda a: a[0], reverse=True)
+
+            # Extract text content from the page with the multi_column utility
+            # We remove the tables from the page content
+            [page_fitz.add_redact_annot(table.bbox)
+             for table in page_fitz.find_tables()]
+            page_fitz.apply_redactions()
+
+            # Extract the text from the columns
+            bboxes = column_boxes(
+                page_fitz, footer_margin=self._footer_marging, no_image_text=True)
+
+            # Concatenate the text from the columns and parse it
+            extracted_text_fitz = ''.join(
+                [page_fitz.get_text(clip=rect, sort=True) for rect in bboxes])
+            extracted_text_fitz = self._parse_text(extracted_text_fitz)
+
+            # Append the text of each line to the page text as one 'text' element
+            this_page_content.append(
+                {
+                    "element_id": element_id,
+                    "element_type": "text",
+                    "element_content": extracted_text_fitz,
+                    "element_description": None,
+                    "element_path": None
+                }
+            )
+
+            element_id += 1
 
             self._logger.info(
                 f"-- Element extraction from page {pagenum} starts...")
@@ -786,10 +833,10 @@ class PDFParser(object):
                 if table_in_page == -1:
                     pass
                 else:
-                    if self._is_text_element_inside_any_table(element, page, tables):
+                    if self._is_text_element_inside_any_table(element, page_pypdf2, tables):
 
                         table_idx = self._find_table_for_element(
-                            element, page, tables)
+                            element, page_pypdf2, tables)
 
                         if table_idx is not None and table_idx == table_in_page:
                             # If a table is found and it is located in the same page as we are currently extracting the content, we add the table to the content
@@ -804,10 +851,7 @@ class PDFParser(object):
                                         "element_path": path_tables[table_idx]
                                     }
                                 )
-
-                                last_element_type = "table"
                                 element_id += 1
-
                             table_in_page += 1
 
                         # Pass this iteration because the content of this element was extracted from the tables
@@ -836,13 +880,11 @@ class PDFParser(object):
                                         "element_path": image_path
                                     }
                                 )
-
-                                last_element_type = "image"
                                 element_id += 1
 
                         continue
 
-                if not self._is_text_element_inside_any_table(element, page, tables):
+                if not self._is_text_element_inside_any_table(element, page_pypdf2, tables):
 
                     if isinstance(element, LTFigure):
 
@@ -860,38 +902,7 @@ class PDFParser(object):
                                 "element_path": image_path
                             }
                         )
-
-                        last_element_type = "image"
                         element_id += 1
-
-                    else:
-                        # Use the function to extract the text and format for each text element
-                        try:
-                            line_text = self._extract_text(element)
-                        except:
-                            line_text = ""
-
-                        if line_text != "":
-
-                            if last_element_type == "text":
-                                # if the former element was text, append the text to the last element
-                                this_page_content[-1]["element_content"] += f" {line_text}"
-                            else:
-
-                                # Append the text of each line to the page text
-                                this_page_content.append(
-                                    {
-                                        "element_id": element_id,
-                                        "element_type": "text",
-                                        "element_content": line_text,
-                                        "element_description": None,
-                                        "element_path": None
-                                    }
-                                )
-
-                                element_id += 1
-
-                            last_element_type = "text"
 
             content_per_page.append(
                 {
