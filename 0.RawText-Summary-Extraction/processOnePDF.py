@@ -30,7 +30,7 @@ def main():
     pdf_parser.parse(pdf_path=pdf_file, path_save=path_save)
 
     # Create a Summarizer with the default parameters and summarize the PDF file
-    summarizer = Summarizer()
+    summarizer = Summarizer(model="gpt-4")
     summarizer.summarize(pdf_file=pdf_file, path_save=path_save)
 
     return
