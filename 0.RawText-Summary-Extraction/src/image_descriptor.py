@@ -1,34 +1,43 @@
+"""
+This class utilizes OpenAI's API to describe and label images using the GPT-4 model. It encodes images as base64 strings and handles rate limits with exponential backoff. 
+
+Author: Lorena Calvo-Bartolomé
+Date: 04/02/2024
+"""
+
 import base64
 import os
 import requests
 import pathlib
-import backoff  # for exponential backoff
+import backoff
 import openai
 from dotenv import load_dotenv
 
+
 class ImageDescriptor(object):
-    
+
     def __init__(self):
+
+        # Load the API key from the .env file
         path_env = pathlib.Path(os.getcwd()).parent / '.env'
         load_dotenv(path_env)
         self._api_key = os.getenv("OPENAI_API_KEY")
-        #self._api_key = os.environ['OPENAI_API_KEY']
 
     def _encode_image(
-        self,
-        image_path: pathlib.Path):
+            self,
+            image_path: pathlib.Path):
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
 
     @backoff.on_exception(backoff.expo, openai.RateLimitError)
     def describe_image(
-        self, 
+        self,
         image_path: pathlib.Path
     ) -> str:
         """Generates a description of the image using OpenAI's API.
 
         Parameters
-        
+
         """
         # Getting the base64 string
         base64_image = self._encode_image(image_path)
@@ -64,16 +73,16 @@ class ImageDescriptor(object):
             "https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
 
         return response.json()["choices"][0]["message"]["content"]
-    
+
     @backoff.on_exception(backoff.expo, openai.RateLimitError)
     def get_label_image(
-        self, 
+        self,
         image_path: pathlib.Path
     ) -> str:
         """Generates a description of the image using OpenAI's API.
 
         Parameters
-        
+
         """
         # Getting the base64 string
         base64_image = self._encode_image(image_path)
@@ -107,5 +116,5 @@ class ImageDescriptor(object):
 
         response = requests.post(
             "https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
-    
+
         return response.json()["choices"][0]["message"]["content"]
