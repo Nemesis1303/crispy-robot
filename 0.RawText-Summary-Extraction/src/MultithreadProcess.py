@@ -52,7 +52,7 @@ class processPDF:
         return data 
     
     @staticmethod
-    def processPDF (path, summary=False ):
+    def processPDF (path, summary=True ):
 
         try:
             # Define the path to the PDF file
@@ -77,25 +77,24 @@ class processPDF:
             """You are a helpful AI assistant working with the generation of summaries of PDF documents. Please summarize the given document by sections in such a way that the outputted text can be used as input for a topic modeling algorithm. Dont start with 'The document can be summarized...' or 'The document is about...'. Just start with the first section of the document.
             """
             
-            pdf_parser = PDFParser()
+            # Create a PDFParser and parse the PDF file
+            pdf_parser = PDFParser(
+                generate_img_desc=False,
+                generate_table_desc=False,
+            )
+            pdf_parser.parse(pdf_path=pdf_file, path_save=path_save)
             
             if summary:
-                summarizer = Summarizer()      
-                summarizer.summarize(
-                    pdf_file=pdf_file,
-                    instructions=instructions,
-                    path_save=path_save
-                )
-            
-            content = pdf_parser.parse(
-                pdf_path=pdf_file,
-                path_save=path_save)
-            
+                # Create a Summarizer with the default parameters and summarize the PDF file
+                summarizer = Summarizer(model="gpt-4")
+                summarizer.summarize(pdf_file=pdf_file, path_save=path_save)
+                                    
             #file ok
             return ({'path':path,'result':True})
-        except:
-            #file ko
-            return ({'path':path,'result':False})
+        except Exception as E:
+            #file ko            
+            #return ({'path':path,'result':False})
+            return ({'path':path,'result':str(E)})
               
 
     def processFiles ( self ):
