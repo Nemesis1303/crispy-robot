@@ -52,14 +52,14 @@ class processPDF:
         return data 
     
     @staticmethod
-    def processPDF (path, summary=True ):
+    def processPDF (path, savedir, summary=True ):
 
         try:
             # Define the path to the PDF file
             pdf_file = pathlib.Path (path)
             
             # Create a directory to save the extracted content (one directory per PDF file)
-            path_save = pathlib.Path('/export/data_ml4ds/thuban/repository/data/output/') / pdf_file.stem
+            path_save = pathlib.Path(savedir) / pdf_file.stem
             path_save.mkdir(parents=True, exist_ok=True)
             path_save.joinpath("images").mkdir(parents=True, exist_ok=True)
             path_save.joinpath("tables").mkdir(parents=True, exist_ok=True)
@@ -101,12 +101,13 @@ class processPDF:
         
         listFiles = self.__getAllDocs (self.__inputDir__)
         self.__listFiles__ = listFiles
+        saveDirList = [self.__outputDir__] * len(listFiles)
 
         num_processes = multiprocessing.cpu_count() if self.__workers__ == 0 else self.__workers__
         print ('using %s workers to process %s files' % (num_processes, len(listFiles)))
 
         with multiprocessing.Pool(processes=num_processes) as pool:
-            results = pool.map(processPDF.processPDF, listFiles)
+            results = pool.starmap(processPDF.processPDF, zip(listFiles, saveDirList))
             if any(results):
                 self.__results__ = results
                 return results
