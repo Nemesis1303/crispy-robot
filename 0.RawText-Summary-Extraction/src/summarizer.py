@@ -22,7 +22,8 @@ from src.utils import messages_to_prompt, completion_to_prompt
 class Summarizer(object):
     def __init__(
         self,
-        model="HuggingFaceH4/zephyr-7b-beta",
+        model_type: str ="hf",  # "hf" or "openai
+        model_name: str ="HuggingFaceH4/zephyr-7b-beta",
         temperature: float = 0,
         chunk_size: int = 1024,
         instructions: str = None
@@ -42,19 +43,19 @@ class Summarizer(object):
                 """You are a helpful AI assistant working with the generation of summaries of PDF documents. Please summarize the given document by sections in such a way that the outputted text can be used as input for a topic modeling algorithm. Dont start with 'The document can be summarized...' or 'The document is about...'. Just start with the first section of the document.
             """
 
-        if model.startswith("gpt"):
+        if model_type == "openai":
             llm=OpenAI(
                 temperature=temperature,
-                model=model)
+                model=model_name)
             self._service_context = ServiceContext.from_defaults(
                 llm=llm,
                 chunk_size=chunk_size,
             )
-            self._logger.info(f"-- Using OpenAI model {model}")
-        elif model.startswith("HuggingFace"):
+            self._logger.info(f"-- Using OpenAI model {model_name}")
+        elif model_type == "hf":
             llm = HuggingFaceLLM(
-                model_name=model,
-                tokenizer_name=model,
+                model_name=model_name,
+                tokenizer_name=model_name,
                 context_window=3900,
                 max_new_tokens=256,
                 #generate_kwargs={"temperature": 0.7, "top_k": 50, "top_p": 0.95},
@@ -67,7 +68,9 @@ class Summarizer(object):
                 chunk_size=chunk_size,
                 embed_model="local"
             )
-            self._logger.info(f"-- Using HuggingFace model {model}")
+            self._logger.info(f"-- Using HuggingFace model {model_name}")
+        else:
+            raise ValueError(f"Model type {model_type} not recognized")
             
         # Set up service context
         self._service_context = ServiceContext.from_defaults(

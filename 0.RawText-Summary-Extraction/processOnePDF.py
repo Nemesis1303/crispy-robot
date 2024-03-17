@@ -30,7 +30,16 @@ def main():
     pdf_parser.parse(pdf_path=pdf_file, path_save=path_save)
 
     # Create a Summarizer with the default parameters and summarize the PDF file
-    summarizer = Summarizer(model="gpt-4")
+    ## TO USE THE OPENAI MODEL, UNCOMMENT THE FOLLOWING LINE
+    #summarizer = Summarizer(
+    #    model_type="openai",
+    #    model_name="gpt-4",
+    #)
+    ## TO USE THE HUGGINGFACE MODEL, UNCOMMENT THE FOLLOWING LINE
+    summarizer = Summarizer(
+        model_type="hf",
+        model_name="HuggingFaceH4/zephyr-7b-beta",
+    )
     summarizer.summarize(pdf_file=pdf_file, path_save=path_save)
 
     return

@@ -162,3 +162,5 @@ cython_debug/
 # CUSTOM
 data
 .env
+.venv2
+*.DS_Store
