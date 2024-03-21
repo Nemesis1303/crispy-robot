@@ -1,0 +1,3 @@
+INPUT_DIR="/data/repo/"
+OUTPUT_DIR="/data/output/"
+PARQUET_FILE="/data/output/data.parquet"

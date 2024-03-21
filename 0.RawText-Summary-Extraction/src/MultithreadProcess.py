@@ -86,7 +86,10 @@ class processPDF:
             
             if summary:
                 # Create a Summarizer with the default parameters and summarize the PDF file
-                summarizer = Summarizer(model="gpt-4")
+                summarizer = Summarizer(
+                    model_type="openai",
+                    model_name="gpt-4",
+                )                            
                 summarizer.summarize(pdf_file=pdf_file, path_save=path_save)
                                     
             #file ok
