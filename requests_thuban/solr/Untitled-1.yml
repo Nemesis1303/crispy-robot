@@ -1,0 +1,41 @@
+
+curl -X POST "http://kumo01:8983/solr/test_thuban/update" \
+     -H "Content-Type: application/json" \
+     -d '[
+  {
+    "id": 4,
+    "file_path": "../data/analitica_negocio.pdf",
+    "total_pages": 1,
+    "format": "PDF 1.4",
+    "title": "",
+    "author": "",
+    "subject": "",
+    "keywords": "",
+    "creator": "JasperReports (cpa)",
+    "producer": "iText 2.1.7 by 1T3XT",
+    "creationDate": "D:20231227165923+01'00'",
+    "modDate": "D:20231227165923+01'00'",
+    "trapped": "",
+    "header": "Curso Académico: Analítica de Negocio",
+    "footer": "Peso porcentual del resto de la evaluación: Peso porcentual de la Convocatoria Extraordinaria: 100% 1 Peso porcentual del Examen Final: 0 100 Trabajos en grupo (30%), trabajos individual del alumno (30%) y exámenes parciales (40%). Página 1 de",
+    "my-content": "Curso Académico: Analítica de Negocio Fecha de revisión: 2–5–223 Departamento asignado a la asignatura: Departamento de Estadística Coordinador/a: JIMENEZ RECAREDO, RAUL JOSE Tipo: Optativa Créditos ECTS : 3. Curso : Cuatrimestre : 2 OBJETIVOS Comprender qué es la , estudiando sus herramientas principales y su aplicación a diferentes estudios de caso. DESCRIPCIÓN DE CONTENIDOS: PROGRAMA Introducción a la analítica de negocios. Analítica descriptiva: Modelos estadísticos de inteligencia de negocios. Visualización de datos y warehousing. Analítica predictiva: Data mining. Modelos predictivos de aprendizaje automático. Análisis web y de redes sociales. Analítica prescriptiva: Simulación y optimización para la toma de decisiones. Big data: Conceptos y herramientas. Ejemplos de aplicación: Desde el business case hasta el estudio de caso. ACTIVIDADES FORMATIVAS, METODOLOGÍA A UTILIZAR Y RÉGIMEN DE TUTORÍAS Clase teórica Clases prácticas Prácticas de laboratorio Tutorías Trabajo en grupo Trabajo individual del estudiante Exámenes parciales y finales SISTEMA DE EVALUACIÓN Trabajos en grupo (3%), trabajos individual del alumno (3%) y exámenes parciales (4%). Página de"
+  },
+  {
+    "id": 5,
+    "file_path": "../data/analitica_negocio.pdf",
+    "total_pages": 1,
+    "format": "PDF 1.4",
+    "title": "",
+    "author": "",
+    "subject": "",
+    "keywords": "",
+    "creator": "JasperReports (cpa)",
+    "producer": "iText 2.1.7 by 1T3XT",
+    "creationDate": "D:20231227165923+01'00'",
+    "modDate": "D:20231227165923+01'00'",
+    "trapped": "",
+    "header": "Curso Académico: Analítica de Negocio",
+    "footer": "Peso porcentual del resto de la evaluación: Peso porcentual de la Convocatoria Extraordinaria: 100% 1 Peso porcentual del Examen Final: 0 100 Trabajos en grupo (30%), trabajos individual del alumno (30%) y exámenes parciales (40%). Página 1 de",
+    "my-content": "Curso Académico: Analítica de Negocio Fecha de revisión: 2–5–223 Departamento asignado a la asignatura: Departamento de Estadística Coordinador/a: JIMENEZ RECAREDO, RAUL JOSE Tipo: Optativa Créditos ECTS : 3. Curso : Cuatrimestre : 2 OBJETIVOS Comprender qué es la , estudiando sus herramientas principales y su aplicación a diferentes estudios de caso. DESCRIPCIÓN DE CONTENIDOS: PROGRAMA Introducción a la analítica de negocios. Analítica descriptiva: Modelos estadísticos de inteligencia de negocios. Visualización de datos y warehousing. Analítica predictiva: Data mining. Modelos predictivos de aprendizaje automático. Análisis web y de redes sociales. Analítica prescriptiva: Simulación y optimización para la toma de decisiones. Big data: Conceptos y herramientas. Ejemplos de aplicación: Desde el business case hasta el estudio de caso. ACTIVIDADES FORMATIVAS, METODOLOGÍA A UTILIZAR Y RÉGIMEN DE TUTORÍAS Clase teórica Clases prácticas Prácticas de laboratorio Tutorías Trabajo en grupo Trabajo individual del estudiante Exámenes parciales y finales SISTEMA DE EVALUACIÓN Trabajos en grupo (3%), trabajos individual del alumno (3%) y exámenes parciales (4%). Página de"
+  }
+]'

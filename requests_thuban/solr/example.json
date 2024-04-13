@@ -1,0 +1,38 @@
+[
+    {
+      "id": 0,
+      "file_path": "../data/analitica_negocio.pdf",
+      "total_pages": 1,
+      "format": "PDF 1.4",
+      "title": "Analitica de negocio",
+      "author": "uc3m",
+      "subject": "",
+      "keywords": "",
+      "creator": "JasperReports (cpa)",
+      "producer": "iText 2.1.7 by 1T3XT",
+      "creationDate": "D:20231227165923+01'00'",
+      "modDate": "D:20231227165923+01'00'",
+      "header": "Curso Académico: Analítica de Negocio",
+      "footer": "Peso porcentual del resto de la evaluación: Peso porcentual de la Convocatoria Extraordinaria: 100% 1 Peso porcentual del Examen Final: 0 100 Trabajos en grupo (30%), trabajos individual del alumno (30%) y exámenes parciales (40%). Página 1 de",
+      "content": "Curso Académico: Analítica de Negocio Fecha de revisión: 2–5–223 Departamento asignado a la asignatura: Departamento de Estadística Coordinador/a: JIMENEZ RECAREDO, RAUL JOSE Tipo: Optativa Créditos ECTS : 3. Curso : Cuatrimestre : 2 OBJETIVOS Comprender qué es la , estudiando sus herramientas principales y su aplicación a diferentes estudios de caso. DESCRIPCIÓN DE CONTENIDOS: PROGRAMA Introducción a la analítica de negocios. Analítica descriptiva: Modelos estadísticos de inteligencia de negocios. Visualización de datos y warehousing. Analítica predictiva: Data mining. Modelos predictivos de aprendizaje automático. Análisis web y de redes sociales. Analítica prescriptiva: Simulación y optimización para la toma de decisiones. Big data: Conceptos y herramientas. Ejemplos de aplicación: Desde el business case hasta el estudio de caso. ACTIVIDADES FORMATIVAS, METODOLOGÍA A UTILIZAR Y RÉGIMEN DE TUTORÍAS Clase teórica Clases prácticas Prácticas de laboratorio Tutorías Trabajo en grupo Trabajo individual del estudiante Exámenes parciales y finales SISTEMA DE EVALUACIÓN Trabajos en grupo (3%), trabajos individual del alumno (3%) y exámenes parciales (4%). Página de"
+    },
+    {   
+        "id": 1,
+        "source": "data/TDS-BBCC06105-2_Technical Description_GB-1.pdf",
+        "file_path": "data/TDS-BBCC06105-2_Technical Description_GB-1.pdf",
+        "total_pages": 25,
+        "format": "PDF 1.7",
+        "title": "Gerätetyp:",
+        "author": "SBrahtz",
+        "subject": "",
+        "keywords": "",
+        "creator": "Microsoft® Word für Microsoft 365",
+        "producer": "macOS Version 13.6.1 (Build 22G313) Quartz PDFContext, AppendMode 1.1",
+        "creationDate": "D:20220601102655Z00'00'",
+        "modDate": "D:20240115113009Z00'00'",
+        "header": "Item No. BBCC06105 (24V) Roof-top air conditioner 680",
+        "footer": "Dreiha GmbH, Bremen Property of Dreiha GmbH – Technical changes reserved – Issues with older date are herewith invalid Issue 01 Date: 08/20 Approved by: Edited by: TBE-Schuldt GF-Brahtz",
+        "content": "The roof–top air conditioner is designed for mounting on the roof of a vehicle (see drawing DRP–\nBBCC006105–1). The water connections of the heat exchanger are routed out of the unit on the \nright rear side. The refrigerant connections are located on the left side. The electrical adapter connectors are routed downwards through the recirculating–air opening and \nout of the unit. The power supply to the unit is combined in a 6–pin AMP housing, the data line is in \na 4–pin AMP housing (see circuit diagram no. WDG–BBCC06105). Depending on the operating mode, the air is sucked in by the intake air radial fan via the outside \nor recirculating air intake openings. This mixed air is heated via the hot water heat exchanger or \ncooled via the refrigerant evaporator, depending on the operating mode. The intake air is blown \ninto the cabin via the upstream roof air diffuser. The water flow through the hot water heat exchanger is regulated by cycling the water solenoid \nvalve. The intake air double radial–flow blower fan is steplessly regulated via the climate control unit \nintegrated in control panel KL0008203 The different operating modes (heating, cooling, ventilation, \ndemisting) are also regulated via the climate control integrated in control panel KL0008203 \n(Technical description no. TDS–KL0008203)."
+    }
+  ]
+  
