@@ -211,6 +211,10 @@ class NLPpipeline(object):
             DataFrame with the lemmas column added to it as "col_calculate_on_LEMMAS"
         """
 
+        # Download spaCy model if not already downloaded and load
+        # Disable parser and NER to speed up processing
+        nlp = load_spacy(self._spaCy_model, exclude=['parser', 'ner'])
+        
         def do_lemmas(text):
             # 1. Change acronyms by their meaning
             if replace_acronyms:
@@ -226,10 +230,6 @@ class NLPpipeline(object):
             except:
                 text = text
             # 3. Lemmatize text
-            # Download spaCy model if not already downloaded and load
-            # Disable parser and NER to speed up processing
-            nlp = load_spacy(self._spaCy_model, exclude=['parser', 'ner'])
-
             try:
                 doc = nlp(text)
             except Exception as e:
@@ -375,7 +375,50 @@ class NLPpipeline(object):
         self,
         df: pd.DataFrame,
         col_calculate_on: str
-    ):
+    ):  
+        
+        col_calculate_on_lemmas = f"{col_calculate_on}_LEMMAS"
+        if col_calculate_on_lemmas not in self._lemmas_cols:
+            self._logger.error(
+                f"-- -- Lemmas for column {col_calculate_on} have not been calculated yet. Please calculate lemmas first.")
+            return df
+        
+        # Download spaCy model if not already downloaded and load
+        # Disable parser and NER to speed up processing
+        nlp = load_spacy(self._spaCy_model, exclude=['lemmatization', 'parser'])
+
+        def get_ners(text):
+            try:
+                doc = nlp(text)
+            except Exception as e:
+                self._logger.error(
+                    f"-- -- Error ocurred while applying Spacy pipe: {e}")
+                try:
+                    # If error, try to apply the pipe with a larger max_length
+                    self.nlp_max_length = nlp.max_length
+                    nlp.max_length = len(text)
+                    doc = nlp(text)
+                    nlp.max_length = self.nlp_max_length
+                except Exception as e:
+                    self._logger.error(
+                        f"-- -- Error ocurred while applying Spacy pipe: {e} after increasing max_length...")
+                    nlp.max_length = self.nlp_max_length
+                    return []
+
+            ners = [(token.lemma_, token.label_) for token in doc]
+            return ners
+
+        # Apply NER extraction to the text
+        self._logger.info(f"-- -- Extracting generic NERS...")
+        start_time = time.time()
+        col_save = f"{col_calculate_on}_GEN_NERS"
+        df[col_save] = df[col_calculate_on_lemmas].apply(get_ners)
+        
+        # Save the column name for future reference
+        self._lemmas_cols.append(col_save)
+        self._logger.info(
+            f'-- -- Generic NER identification finished in {(time.time() - start_time)}')
+        
         return df
     
     def get_ner_specific(
@@ -387,11 +430,11 @@ class NLPpipeline(object):
         self._logger.info(f"-- -- Extracting specific NER...")
         start_time = time.time()
         NSE = NERSpecificExtractor(lang =self._lang, logger=self._logger)
-        col_save = f"{col_calculate_on}_NERS"
+        col_save = f"{col_calculate_on}_SPEC_NERS"
         df[col_save] = df[col_calculate_on].apply(NSE.extract)
        
         
         self._logger.info(
-            f'Specific NER identification finished in {(time.time() - start_time)}')
+            f'-- -- Specific NER identification finished in {(time.time() - start_time)}')
         
         return df
