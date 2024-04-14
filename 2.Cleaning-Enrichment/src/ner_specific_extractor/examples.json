@@ -1,0 +1,18 @@
+[
+    {
+        "text": "You can't pet a great chocolate flavor with carob.",
+        "entities": {
+            "INGREDIENT": ["carob"],
+            "EQUIPMENT": [],
+            "DISH": []
+        }
+    },
+    {
+        "text": "You can probably sand-blast it if it's an anodized aluminum pan.",
+        "entities": {
+            "INGREDIENT": [],
+            "EQUIPMENT": ["anodized aluminum pan"],
+            "DISH": []
+        }
+    }
+]

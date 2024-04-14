@@ -8,6 +8,10 @@ def create_acronym_list(acronyms_data):
         acronym_pattern = r'\b{}\b'.format(acronym)
         acronyms_list.append((acronym_pattern, full_form))
 
+    # Remove duplicates if any
+    acronyms_list_dict = dict(acronyms_list)
+    acronyms_list = list(acronyms_list_dict.items())
+    
     return acronyms_list
 
 def test_acronym_extractor():
