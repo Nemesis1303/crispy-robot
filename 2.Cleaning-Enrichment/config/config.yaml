@@ -1,11 +1,11 @@
 pipe:
   #- lang_id        # Identifies the language of the text
-  - acronyms        # Identifies the acronyms of the text
-  - lemmas          # Creates lemmas from the text
-  - ngrams          # Generates n-grams from the text
+  #- acronyms        # Identifies the acronyms of the text
+  #- lemmas          # Creates lemmas from the text
+  #- ngrams          # Generates n-grams from the text
   #- embeddings      # Generates BERT embeddings
   #- ner_generic     # Identifies generic named entities (e.g. person, location, organization)
-  #- ner_specific    # Identifies specific named entities (e.g. Apple, Microsoft, New York)
+  - ner_specific    # Identifies specific named entities (e.g. Apple, Microsoft, New York)
 
 options_pipe:
   spaCy_model: 'en_core_web_md'

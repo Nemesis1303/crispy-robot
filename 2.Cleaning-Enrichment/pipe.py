@@ -11,7 +11,6 @@ def cal_element_pipe(
     col_calculate_on,
     replace_acronyms=False
 ) -> pd.DataFrame:
-    
     if element == "lang_id":
         df = pipe.get_lang(df, col_calculate_on)
     elif element == "acronyms":
@@ -24,7 +23,7 @@ def cal_element_pipe(
         df = pipe.get_context_embeddings(df, col_calculate_on)
     elif element == "ner_generic":
         df = pipe.get_ner_generic(df, col_calculate_on)
-    elif element == "ner_specific ":
+    elif element == "ner_specific":
         df = pipe.get_ner_specific(df, col_calculate_on)
     else:
         raise ValueError(f"-- -- Element '{element}' not recognized.")
@@ -68,7 +67,7 @@ if __name__ == "__main__":
     
     # Load data
     df = pd.read_parquet(args.source)
-    df_aux = df.copy().iloc[0:2]
+    df_aux = df.copy().iloc[0:5]
     col_calculate_on = "raw_text"
     print(df_aux)
     

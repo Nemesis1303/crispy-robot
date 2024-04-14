@@ -43,23 +43,3 @@ class AcronymExtractor(object):
         )
 
     def extract(self, text): return self._nlp(text)._.acronyms
-
-
-# if __name__ == "__main__":
-#     import argparse
-
-#     parser = argparse.ArgumentParser(
-#         description="Process text to extract acronyms.")
-#     parser.add_argument(
-#         "text", type=str, help="Text to extract acronyms from.")
-#     parser.add_argument("config_path", type=pathlib.Path,
-#                         help="Path to the configuration file to use.")
-#     parser.add_argument("--lang", default="en", help="Language to use.")
-#     parser.add_argument("--verbose", action="store_true",
-#                         help="Show extra information.")
-
-#     args = parser.parse_args()
-
-#     extractor = AcronymExtractor(args.config_path, args.lang)
-#     acronyms = extractor.extract(args.text)
-#     print(acronyms)

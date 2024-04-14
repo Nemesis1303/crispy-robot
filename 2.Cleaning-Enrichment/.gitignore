@@ -164,3 +164,4 @@ data
 .env
 .venv2
 *.DS_Store
+*local-cached

@@ -13,6 +13,7 @@ import torch
 from langdetect import detect
 
 from src.acronym_extractor.acronym_extractor import AcronymExtractor
+from src.ner_specific_extractor.ner_specific_extractor import NERSpecificExtractor
 
 
 class NLPpipeline(object):
@@ -381,5 +382,16 @@ class NLPpipeline(object):
         self,
         df: pd.DataFrame,
         col_calculate_on: str
-    ):
+    ):  
+        
+        self._logger.info(f"-- -- Extracting specific NER...")
+        start_time = time.time()
+        NSE = NERSpecificExtractor(lang =self._lang, logger=self._logger)
+        col_save = f"{col_calculate_on}_NERS"
+        df[col_save] = df[col_calculate_on].apply(NSE.extract)
+       
+        
+        self._logger.info(
+            f'Specific NER identification finished in {(time.time() - start_time)}')
+        
         return df
