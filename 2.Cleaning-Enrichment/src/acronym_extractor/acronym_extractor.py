@@ -35,11 +35,16 @@ class AcronymExtractor(object):
 
         if not config_path:
             config_path = pathlib.Path(os.getcwd()) / "src" / "acronym_extractor" / "config.cfg"
+            examples_path = pathlib.Path(
+                os.getcwd()) / "src" / "ner_specific_extractor" / "examples.json"
         
         self._logger.info(f"-- -- Loading config from {config_path}")
         self._nlp = assemble(
             config_path,
-            overrides={"nlp.lang": lang}
+            overrides={
+                "nlp.lang": lang,
+                "components.llm.task.examples.path": examples_path.as_posix()
+            }
         )
 
     def extract(self, text): return self._nlp(text)._.acronyms
