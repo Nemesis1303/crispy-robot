@@ -62,7 +62,10 @@ class AcronymExtractTask(object):
         for doc, prompt_response in zip(docs, responses):
             try:
                 if type(prompt_response) == list and len(prompt_response) == 1:
-                    prompt_response = eval(prompt_response[0])
+                    try:
+                        prompt_response = eval(prompt_response[0])
+                    except:
+                        promt_response = promt_response[0]
                 setattr(
                     doc._,
                     self._field,

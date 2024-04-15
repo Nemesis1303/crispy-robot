@@ -268,7 +268,6 @@ class NLPpipeline(object):
         self._lemmas_cols.append(col_save)
         self._logger.info(
             f'-- -- Lemmatization finished in {(time.time() - start_time)}')
-
         return df
     
     def get_ngrams(
@@ -303,7 +302,7 @@ class NLPpipeline(object):
         self._logger.info(f"-- -- Extracting n-grams...")
         start_time = time.time()
         df[col_calculate_on_lemmas] = df[col_calculate_on_lemmas].apply(lambda x: x.split())
-        lemmas = df.col_calculate_on_lemmas
+        lemmas = df[col_calculate_on_lemmas]
         # Create Phrase model for n-grams detection
         phrase_model = Phrases(
             lemmas,
@@ -312,10 +311,7 @@ class NLPpipeline(object):
         
         # Carry out n-grams substitution
         # N-grams are stored in the same column as lemmas (directly substituting them)        
-        df[col_calculate_on_lemmas] = df[col_calculate_on_lemmas].apply(get_ngram)
-        
-        df[col_calculate_on_lemmas] = df[col_calculate_on_lemmas].apply(lambda x: " ".join(x))
-        
+        df[col_calculate_on_lemmas] = df[col_calculate_on_lemmas].apply(get_ngram) 
         self._logger.info(
             f"-- -- N-grams extraction finished in {(time.time() - start_time)}")
 
@@ -408,7 +404,7 @@ class NLPpipeline(object):
                     nlp.max_length = self.nlp_max_length
                     return []
 
-            ners = [(token.lemma_, token.label_) for token in doc]
+            ners = [(ent.text, ent.label_) for ent in doc.ents]
             return ners
 
         # Apply NER extraction to the text
