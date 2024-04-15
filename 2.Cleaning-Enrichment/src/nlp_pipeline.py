@@ -254,7 +254,7 @@ class NLPpipeline(object):
                       and token.lemma_ not in self._stw_list]
 
             # Convert to lowercase
-            final_tokenized = [token.lower() for token in lemmas]
+            final_tokenized = " ".join([token.lower() for token in lemmas])
 
             return final_tokenized
 
@@ -302,7 +302,8 @@ class NLPpipeline(object):
         # Create corpus from tokenized lemmas
         self._logger.info(f"-- -- Extracting n-grams...")
         start_time = time.time()
-        lemmas = df[col_calculate_on_lemmas]
+        df[col_calculate_on_lemmas] = df[col_calculate_on_lemmas].apply(lambda x: x.split())
+        lemmas = df.col_calculate_on_lemmas
         # Create Phrase model for n-grams detection
         phrase_model = Phrases(
             lemmas,
@@ -312,6 +313,8 @@ class NLPpipeline(object):
         # Carry out n-grams substitution
         # N-grams are stored in the same column as lemmas (directly substituting them)        
         df[col_calculate_on_lemmas] = df[col_calculate_on_lemmas].apply(get_ngram)
+        
+        df[col_calculate_on_lemmas] = df[col_calculate_on_lemmas].apply(lambda x: " ".join(x))
         
         self._logger.info(
             f"-- -- N-grams extraction finished in {(time.time() - start_time)}")
