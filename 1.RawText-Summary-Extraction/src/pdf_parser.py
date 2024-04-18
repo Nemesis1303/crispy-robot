@@ -384,38 +384,6 @@ class PDFParser(object):
         table_output_save = None
         description = None
 
-        def eliminate_patterns(text):
-            """
-            Eliminate fixed patterns from the input string.
-
-            Parameters
-            ----------
-            text : str
-                String to be processed
-
-            Returns
-            -------
-            result : str
-                String without the fixed patterns
-            """
-
-            # Patterns to be removed from the inut string
-            # TODO: This should be made general
-            PATTERNS = [
-                r'^TDS-.*',
-                r'Sheet (\d+) of (\d+)',
-                r'Date (\d{2}.\d{2})',
-                r'Technical Description',
-                r'Checked by: [A-Za-z0-9-]+'
-            ]
-            combined_pattern = re.compile(
-                "|".join(PATTERNS), flags=re.IGNORECASE)
-
-            # Remove patterns
-            result = re.sub(combined_pattern, "", text)
-
-            return result.strip()
-
         # Convert to string
         table_string = ""
         # Iterate through each row of the table
@@ -424,7 +392,7 @@ class PDFParser(object):
             row = table[row_num]
             # Remove the line breaker from the wrapted texts
             cleaned_row = [
-                eliminate_patterns(item.replace("\n", " "))
+                (item.replace("\n", " ")).strip()
                 if item is not None
                 else ""
                 if item is None

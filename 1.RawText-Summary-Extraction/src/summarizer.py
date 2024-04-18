@@ -34,13 +34,14 @@ class Summarizer(object):
         self._api_key = os.getenv("OPENAI_API_KEY")
 
         logging.basicConfig(level='INFO')
-        self._logger = logging.getLogger('PDFParser')
+        self._logger = logging.getLogger('Summarizer')
 
         if instructions:
             self._instructions = instructions
         else:
+            # Slightly modified from https://www.reddit.com/r/ChatGPT/comments/11twe7z/prompt_to_summarize/
             self._instructions = \
-                """You are a helpful AI assistant working with the generation of summaries of PDF documents. Please summarize the given document by sections in such a way that the outputted text can be used as input for a topic modeling algorithm. Dont start with 'The document can be summarized...' or 'The document is about...'. Just start with the first section of the document.
+                """You are a helpful AI assistant working with the generation of summaries of PDF documents. Can you provide a comprehensive summary of the given text by sections? The summary should cover all the key points and main ideas presented in the original text, while also condensing the information into a concise and easy-to-understand format. Please ensure that the summary includes relevant details and examples that support the main ideas, while avoiding any unnecessary information or repetition. The length of the summary should be appropriate for the length and complexity of the original text, providing a clear and accurate overview without omitting any important information. Do not start the summary with 'The document is about...' or 'The document can be summarized...'.
             """
 
         if model_type == "openai":
@@ -56,9 +57,6 @@ class Summarizer(object):
             llm = HuggingFaceLLM(
                 model_name=model_name,
                 tokenizer_name=model_name,
-                context_window=3900,
-                max_new_tokens=256,
-                #generate_kwargs={"temperature": 0.7, "top_k": 50, "top_p": 0.95},
                 messages_to_prompt=messages_to_prompt,
                 completion_to_prompt=completion_to_prompt,
                 device_map="auto",
