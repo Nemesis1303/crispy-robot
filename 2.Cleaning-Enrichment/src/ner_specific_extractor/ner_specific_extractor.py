@@ -1,11 +1,12 @@
 import os
 import pathlib
+import re
 from wasabi import msg
 from dotenv import load_dotenv
 import logging
 
 from spacy_llm.util import assemble
-
+from src.utils import split_into_chunks, flatten
 
 class NERSpecificExtractor(object):
     def __init__(
@@ -47,5 +48,37 @@ class NERSpecificExtractor(object):
             }
         )
 
-    def extract(self, text): return [(ent.text, ent.label_)
-                                     for ent in self._nlp(text).ents]
+    def extract(self, text): 
+        try:
+            return [(ent.text, ent.label_)
+                    for ent in self._nlp(text).ents]
+        except Exception as e:
+            # Extract the maximum context length from the error
+            pattern = r"maximum context length is (\d+) tokens"
+            match = re.search(pattern, e.args[0])
+
+            if match:
+                max_context_length = int(match.group(1))
+                self._logger.info(
+                    f"-- -- The maximum context length is {max_context_length} tokens.")
+            else:
+                self._logger.error(
+                    "-- -- Maximum context length not found in the error message. Another error occurred.")
+            
+            # Split the text into chunks
+            text_chunks = split_into_chunks(text, max_context_length  - 1)
+            
+            processed_chunks = []
+            for chunk in text_chunks:
+                try:
+                    ner_chunk = [(ent.text, ent.label_)
+                    for ent in self._nlp(chunk).ents]
+                    processed_chunks.append(ner_chunk)
+                except Exception as e:
+                    self._logger.error(f"-- -- Error processing chunk: {e}")
+                    continue
+
+            return flatten(processed_chunks)
+        
+        
+     

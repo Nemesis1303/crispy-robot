@@ -123,7 +123,7 @@ class NLPpipeline(object):
 
         def create_acronym_list(acronyms_data):
             acronyms_list = []
-            for acronym, full_form in acronyms_data:
+            for acronym, full_form in acronyms_data.values.tolist():
                 acronym_pattern = r'\b{}\b'.format(acronym)
                 acronyms_list.append((acronym_pattern, full_form))
 

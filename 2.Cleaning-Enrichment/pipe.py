@@ -11,6 +11,7 @@ def cal_element_pipe(
     col_calculate_on,
     replace_acronyms=False
 ) -> pd.DataFrame:
+
     if element == "lang_id":
         df = pipe.get_lang(df, col_calculate_on)
     elif element == "acronyms":

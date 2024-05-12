@@ -65,7 +65,7 @@ class AcronymExtractTask(object):
                     try:
                         prompt_response = eval(prompt_response[0])
                     except:
-                        promt_response = promt_response[0]
+                        prompt_response = prompt_response[0]
                 setattr(
                     doc._,
                     self._field,
