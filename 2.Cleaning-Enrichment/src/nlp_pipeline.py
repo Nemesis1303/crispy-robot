@@ -1,8 +1,28 @@
+"""
+This class implements a Natural Language Processing (NLP) pipeline to process text data given in a DataFrame in a modular way, allowing the user to choose which steps to apply and in which order. The pipeline includes the following steps:
+- Acronyms extraction
+- Language detection
+- Lemmatization
+- N-grams extraction
+- Contextual embeddings extraction
+- Named Entity Recognition (NER) extraction
+- Specific NER extraction
+
+While the methods are thought to be called independenty, some methods depend on the output of others: the methods 'get_ngrams' and 'get_ner_generic' depend on the lemmas of the text column, so the lemmas MUST have been calculated before.
+
+
+Author: Lorena Calvo-Bartolomé
+Date: 12/05/2024
+"""
+
 import time
+import numpy as np
 import pandas as pd
 import logging
 import pathlib
 import re
+
+from tqdm import tqdm
 import contractions
 from sentence_transformers import SentenceTransformer
 from typing import List, Tuple
@@ -11,6 +31,8 @@ from gensim.models.phrases import Phrases
 import os
 import torch
 from langdetect import detect
+from src.utils import split_into_chunks
+
 
 from src.acronym_extractor.acronym_extractor import AcronymExtractor
 from src.ner_specific_extractor.ner_specific_extractor import NERSpecificExtractor
@@ -25,6 +47,10 @@ class NLPpipeline(object):
         valid_POS: List[str] = ['VERB', 'NOUN', 'ADJ', 'PROPN'],
         gensim_phraser_min_count: int = 2,
         gensim_phraser_threshold: int = 20,
+        sentence_transformer_model: str = "paraphrase-distilroberta-base-v2",
+        bath_size_embeddings: int = 128,
+        aggregate_embeddings: bool = False,
+        use_gpu: bool = True,
         logger: logging.Logger = None
     ):
 
@@ -48,6 +74,10 @@ class NLPpipeline(object):
         self._valid_POS = set(valid_POS)
         self._gensim_phraser_min_count = gensim_phraser_min_count
         self._gensim_phraser_threshold = gensim_phraser_threshold
+        self._sentence_transformer_model = sentence_transformer_model
+        self._batch_size_embeddings = bath_size_embeddings
+        self._aggregate_embeddings = aggregate_embeddings
+        self._use_gpu = use_gpu
         self._lemmas_cols = []
 
     def _loadSTW(
@@ -62,7 +92,7 @@ class NLPpipeline(object):
         stw_files: list of str
             List of paths to stopwords files
         """
-        
+
         stw_list = \
             [pd.read_csv(stw_file, names=['stopwords'], header=None,
                          skiprows=3) for stw_file in stw_files]
@@ -123,9 +153,14 @@ class NLPpipeline(object):
 
         def create_acronym_list(acronyms_data):
             acronyms_list = []
-            for acronym, full_form in acronyms_data.values.tolist():
-                acronym_pattern = r'\b{}\b'.format(acronym)
-                acronyms_list.append((acronym_pattern, full_form))
+            for acronym_tuple in acronyms_data.values.tolist():
+                try:
+                    acronym, full_form = acronym_tuple
+                    acronym_pattern = r'\b{}\b'.format(acronym)
+                    acronyms_list.append((acronym_pattern, full_form))
+                except Exception as e:
+                    self._logger.error(
+                        f"-- -- Acronym tuple could not be added to the acronyms list: {e}")
 
             # Remove duplicates if any
             acronyms_list_dict = dict(acronyms_list)
@@ -135,23 +170,37 @@ class NLPpipeline(object):
 
         self._logger.info(f"-- -- Extracting acronyms...")
         start_time = time.time()
-        AE = AcronymExtractor(lang =self._lang, logger=self._logger)
+        AE = AcronymExtractor(lang=self._lang, logger=self._logger)
         col_save = f"{col_calculate_on}_ACR"
         df[col_save] = df[col_calculate_on].apply(AE.extract)
         acronyms = df[col_save].explode()
         self._acr_list = create_acronym_list(acronyms)
-        
+
         self._logger.info(
             f'Acronyms identification finished in {(time.time() - start_time)}')
 
         return df
-    
+
     def get_lang(
         self,
         df: pd.DataFrame,
         col_calculate_on: str
     ) -> str:
-        
+        """Detects the language of a text column in a DataFrame using langdetect.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame containing the text column
+        col_calculate_on : str
+            Column name to calculate language on
+            
+        Returns
+        -------
+        df : pd.DataFrame
+            DataFrame with the language column added to it as "lang"
+        """
+
         def det(x: str) -> str:
             """
             Detects the language of a given text
@@ -172,15 +221,15 @@ class NLPpipeline(object):
             except:
                 lang = 'Other'
             return lang
-        
+
         self._logger.info(f"-- Detecting language...")
         start_time = time.time()
-        
+
         df['lang'] = df[col_calculate_on].apply(det)
-    
+
         self._logger.info(
             f'-- -- Language detect finished in {(time.time() - start_time)}')
-        
+
         return df
 
     def get_lemmas(
@@ -214,7 +263,7 @@ class NLPpipeline(object):
         # Download spaCy model if not already downloaded and load
         # Disable parser and NER to speed up processing
         nlp = load_spacy(self._spaCy_model, exclude=['parser', 'ner'])
-        
+
         def do_lemmas(text):
             # 1. Change acronyms by their meaning
             if replace_acronyms:
@@ -263,20 +312,25 @@ class NLPpipeline(object):
         start_time = time.time()
         col_save = f"{col_calculate_on}_LEMMAS"
         df[col_save] = df[col_calculate_on].apply(do_lemmas)
-        
+
         # Save the column name for future reference
         self._lemmas_cols.append(col_save)
         self._logger.info(
             f'-- -- Lemmatization finished in {(time.time() - start_time)}')
         return df
-    
+
     def get_ngrams(
         self,
         df: pd.DataFrame,
         col_calculate_on: str
     ):
         """
-        Get n-grams from a text column in a DataFrame using the Phrases model from Gensim.
+        Get n-grams from a text column in a DataFrame using the Phrases model from Gensim. 
+        --------------
+        | Important: |
+        --------------
+        - The n-grams are extracted from the lemmas of the text column, so the lemmas MUST have been calculated before.
+        - The n-grams are stored in the same column as lemmas (directly substituting them).
 
         Parameters
         ----------
@@ -291,7 +345,7 @@ class NLPpipeline(object):
 
         def get_ngram(doc):
             return " ".join(phrase_model[doc])
-        
+
         col_calculate_on_lemmas = f"{col_calculate_on}_LEMMAS"
         if col_calculate_on_lemmas not in self._lemmas_cols:
             self._logger.error(
@@ -301,17 +355,19 @@ class NLPpipeline(object):
         # Create corpus from tokenized lemmas
         self._logger.info(f"-- -- Extracting n-grams...")
         start_time = time.time()
-        df[col_calculate_on_lemmas] = df[col_calculate_on_lemmas].apply(lambda x: x.split())
+        df[col_calculate_on_lemmas] = df[col_calculate_on_lemmas].apply(
+            lambda x: x.split())
         lemmas = df[col_calculate_on_lemmas]
         # Create Phrase model for n-grams detection
         phrase_model = Phrases(
             lemmas,
-            min_count=self._gensim_phraser_min_count, 
+            min_count=self._gensim_phraser_min_count,
             threshold=self._gensim_phraser_threshold)
-        
+
         # Carry out n-grams substitution
-        # N-grams are stored in the same column as lemmas (directly substituting them)        
-        df[col_calculate_on_lemmas] = df[col_calculate_on_lemmas].apply(get_ngram) 
+        # N-grams are stored in the same column as lemmas (directly substituting them)
+        df[col_calculate_on_lemmas] = df[col_calculate_on_lemmas].apply(
+            get_ngram)
         self._logger.info(
             f"-- -- N-grams extraction finished in {(time.time() - start_time)}")
 
@@ -321,9 +377,6 @@ class NLPpipeline(object):
         self,
         df: pd.DataFrame,
         col_calculate_on: str,
-        batch_size: int = 128,
-        sbert_model: str = "paraphrase-distilroberta-base-v2",
-        use_gpu: bool = True  # Add a parameter to specify GPU usage
     ):
         """Calculate embeddings for text columns in a dataframe using SentenceTransformer.
 
@@ -333,12 +386,6 @@ class NLPpipeline(object):
             Dataframe containing text columns.
         col_calculate_on : str
             Column name to calculate embeddings on.
-        batch_size : int, optional
-            Batch size for SentenceTransformer, by default 128.
-        sbert_model : str, optional
-            SentenceTransformer model to use, by default "paraphrase-distilroberta-base-v2".
-        use_gpu : bool, optional
-            Whether to use GPU for inference, by default True.
 
         Returns
         -------
@@ -348,43 +395,97 @@ class NLPpipeline(object):
 
         self._logger.info(f"-- -- Extracting embeddings...")
         start_time = time.time()
-        
-        device = 'cuda' if use_gpu and torch.cuda.is_available() else 'cpu'
-        model = SentenceTransformer(sbert_model, device=device)
 
-        def encode_text(text):
-            embedding = model.encode(
+        device = 'cuda' if self._use_gpu and torch.cuda.is_available() else 'cpu'
+
+        model = SentenceTransformer(
+            self._sentence_transformer_model,
+            device=device)
+        
+        def get_embedding(text):
+            """Get embeddings for a text using SentenceTransformer.
+            """
+            return model.encode(
                 text,
                 show_progress_bar=True,
-                batch_size=batch_size
+                batch_size=self._batch_size_embeddings
             )
+
+        def encode_text(text):
+            """Encode text into embeddings using SentenceTransformer. If the text is too long for the model and self._aggregate_embeddings is set to True, it will be split into chunks and the embeddings will be averaged. Otherwise, the embeddings will be calculated only for the part of the text that fits the model's maximum sequence length."""
+            
+            if self._aggregate_embeddings:
+                if len(text) > model.get_max_seq_length():
+                    # Split the text into chunks
+                    text_chunks = split_into_chunks(
+                        text, model.get_max_seq_length())
+                    self._logger.info(
+                        f"-- -- {len(text_chunks)} chunks created. Embeddings calculation starts...")
+                else:
+                    self._logger.info(
+                        f"-- -- Chunking was not necessary. Embeddings calculation starts ...")
+                    text_chunks = [text]
+            else:
+                text_chunks = [text]
+
+            embeddings = []
+            for i, chunk in tqdm(enumerate(text_chunks)):
+                embedding = get_embedding(chunk)
+                if i == 0:
+                    embeddings = embedding
+                else:
+                    embeddings.append(embedding)
+            if len(embeddings) > 1:
+                embeddings = np.mean(embeddings, axis=0)
+
             # Convert to string to save space
             embedding = ' '.join(str(x) for x in embedding)
             return embedding
 
         col_save = f"{col_calculate_on}_EMBEDDINGS"
         df[col_save] = df[col_calculate_on].apply(encode_text)
-        
+
         self._logger.info(
             f"-- -- Embeddings extraction finished in {(time.time() - start_time)}")
 
         return df
-    
+
     def get_ner_generic(
         self,
         df: pd.DataFrame,
         col_calculate_on: str
-    ):  
+    ):
+        """Extracts generic Named Entities from a text column in a DataFrame using spaCy.
         
+        --------------
+        | Important: |
+        --------------
+        - The NER are extracted from the lemmas of the text column, so the lemmas MUST have been calculated before.
+        - The NER are stored in a new column as "col_calculate_on_GEN_NERS".
+        
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame containing the text column
+        col_calculate_on : str
+            Column name to calculate NER on
+            
+        Returns
+        -------
+        df : pd.DataFrame
+            DataFrame with the NER column added to it as "col_calculate_on_GEN_NERS"
+        """
+
         col_calculate_on_lemmas = f"{col_calculate_on}_LEMMAS"
         if col_calculate_on_lemmas not in self._lemmas_cols:
             self._logger.error(
                 f"-- -- Lemmas for column {col_calculate_on} have not been calculated yet. Please calculate lemmas first.")
             return df
-        
+
         # Download spaCy model if not already downloaded and load
         # Disable parser and NER to speed up processing
-        nlp = load_spacy(self._spaCy_model, exclude=['lemmatization', 'parser'])
+        nlp = load_spacy(self._spaCy_model, exclude=[
+                         'lemmatization', 'parser'])
 
         def get_ners(text):
             try:
@@ -412,28 +513,41 @@ class NLPpipeline(object):
         start_time = time.time()
         col_save = f"{col_calculate_on}_GEN_NERS"
         df[col_save] = df[col_calculate_on_lemmas].apply(get_ners)
-        
+
         # Save the column name for future reference
         self._lemmas_cols.append(col_save)
         self._logger.info(
             f'-- -- Generic NER identification finished in {(time.time() - start_time)}')
-        
+
         return df
-    
+
     def get_ner_specific(
         self,
         df: pd.DataFrame,
         col_calculate_on: str
-    ):  
+    ):
+        """Extracts specific Named Entities from a text column in a DataFrame using the NERSpecificExtractor class.
         
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame containing the text column
+        col_calculate_on : str
+            Column name to calculate NER on
+        
+        Returns
+        -------
+        df : pd.DataFrame
+            DataFrame with the NER column added to it as "col_calculate_on_SPEC_NERS"
+        """
+
         self._logger.info(f"-- -- Extracting specific NER...")
         start_time = time.time()
-        NSE = NERSpecificExtractor(lang =self._lang, logger=self._logger)
+        NSE = NERSpecificExtractor(lang=self._lang, logger=self._logger)
         col_save = f"{col_calculate_on}_SPEC_NERS"
         df[col_save] = df[col_calculate_on].apply(NSE.extract)
-       
-        
+
         self._logger.info(
             f'-- -- Specific NER identification finished in {(time.time() - start_time)}')
-        
+
         return df

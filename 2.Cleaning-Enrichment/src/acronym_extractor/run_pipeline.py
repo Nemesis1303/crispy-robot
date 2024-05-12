@@ -1,3 +1,5 @@
+"""Example script to run the pipeline for extracting acronyms from a text independently of the AcronymExtractor class.
+"""
 import os
 from pathlib import Path
 import typer
@@ -17,7 +19,6 @@ def run_pipeline(
     config_path: Path = Arg(
         ...,
         help="Path to the configuration file to use."),
-    # examples_path: Path = Arg(..., help="Path to the examples file to use."),
     lang: str = Opt(
         "--en",
         help="Language to use."),

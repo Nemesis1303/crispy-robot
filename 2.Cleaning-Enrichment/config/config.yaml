@@ -13,4 +13,8 @@ options_pipe:
   valid_POS: ['VERB', 'NOUN', 'ADJ', 'PROPN']
   gensim_phraser_min_count: 2
   gensim_phraser_threshold: 20
+  sentence_transformer_model: "paraphrase-distilroberta-base-v2"
+  bath_size_embeddings: 128
+  aggregate_embeddings : False
+  use_gpu: True
   

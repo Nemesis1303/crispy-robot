@@ -1,3 +1,10 @@
+"""
+Main script to apply the NLP pipeline to clean and enrich text data.
+
+Author: Lorena Calvo-Bartolomé
+Date: 12/05/2024
+"""
+
 import argparse
 import logging
 import yaml

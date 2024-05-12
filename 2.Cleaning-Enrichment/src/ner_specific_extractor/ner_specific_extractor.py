@@ -1,3 +1,19 @@
+"""
+This module contains the NERSpecificExtractor class, which is used to extract named entities from a given text using a specific NER model.
+
+The NERSpecificExtractor class provides a method extract a list of named entities from text. It uses a pre-trained NER model augmented with LLM-based input to perform the extraction.
+
+Example usage:
+    extractor = NERSpecificExtractor()
+    text = "Apple Inc. is a technology company based in Cupertino, California."
+    entities = extractor.extract(text)
+    print(entities)
+    # Output: [('Apple Inc.', 'ORG'), ('Cupertino', 'GPE'), ('California', 'GPE')]
+    
+Author: Lorena Calvo-Bartolomé
+Date: 12/05/2024
+"""
+
 import os
 import pathlib
 import re
@@ -15,7 +31,18 @@ class NERSpecificExtractor(object):
         lang: str = "en",
         logger: logging.Logger = None
     ) -> None:
+        """
+        Initialize the NERSpecificExtractor.
 
+        Parameters:
+        ----------
+        config_path (pathlib.Path, optional): 
+            ath to the configuration file for the NER model. If not provided, the default configuration file will be used.
+        lang (str, optional):
+            Language code for the NER model. Defaults to "en".
+        logger (logging.Logger, optional):
+            Logger object for logging messages. If not provided, a default logger will be created.
+        """
         path_env = pathlib.Path(os.getcwd()).parent / '.env'
         load_dotenv(path_env)
         self._api_key = os.getenv("OPENAI_API_KEY")
@@ -48,7 +75,20 @@ class NERSpecificExtractor(object):
             }
         )
 
-    def extract(self, text): 
+    def extract(self, text: str) -> list: 
+        """
+        Extract named entities from the given text.
+
+        Parameters:
+        ----------
+        text (str): 
+            The text from which to extract named entities.
+        
+        Returns:
+        --------
+        list: A list of tuples, where each tuple contains the text of a named entity and its label.
+        """
+
         try:
             return [(ent.text, ent.label_)
                     for ent in self._nlp(text).ents]

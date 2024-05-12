@@ -1,3 +1,17 @@
+"""
+This module provides a class for extracting acronyms from text using Spacy and LLMs (spacy_llm).
+
+The AcronymExtractor class initializes a language model and provides a method to extract acronyms from text. If the text is too long for the context of the language model used, it will be split into chunks and the acronyms will be extracted from each chunk.
+
+Example usage:
+    extractor = AcronymExtractor()
+    acronyms = extractor.extract("This is a sample text.")
+    print(acronyms)  # Output: [('ML', 'Machine Learning')]
+
+Author: Lorena Calvo-Bartolomé
+Date: 12/05/2024
+"""
+
 import os
 import pathlib
 import re
@@ -17,7 +31,18 @@ class AcronymExtractor(object):
         lang: str = "en",
         logger: logging.Logger = None
     ) -> None:
+        """
+        Initialize the AcronymExtractor.
 
+        Parameters
+        ----------
+        config_path : pathlib.Path, optional
+            The path to the configuration file for the language model, by default None
+        lang : str, optional
+            The language of the text, by default "en"
+        logger : logging.Logger, optional
+            The logger object for logging messages, by default None
+        """
         path_env = pathlib.Path(os.getcwd()).parent / '.env'
         load_dotenv(path_env)
         self._api_key = os.getenv("OPENAI_API_KEY")
@@ -38,20 +63,18 @@ class AcronymExtractor(object):
         if not config_path:
             config_path = pathlib.Path(
                 os.getcwd()) / "src" / "acronym_extractor" / "config.cfg"
-            # examples_path = pathlib.Path(
-            #    os.getcwd()) / "src" / "acronym_extractor" / "examples.#json"
 
         self._logger.info(f"-- -- Loading config from {config_path}")
         self._nlp = assemble(
             config_path,
             overrides={
                 "nlp.lang": lang,
-                # "components.llm.task.examples.path": examples_path.as_posix()
             }
         )
 
-    def extract(self, text):
-        """Extract acronyms from text. If the text is too long for the context of the LLM used, it will be split into chunks based on the maximum context length and size of the prompt template, and the acronyms will be extracted from each chunk.
+    def extract(self, text: str) -> list[str]:
+        """
+        Extract acronyms from text. If the text is too long for the context of the language model used, it will be split into chunks based on the maximum context length and size of the prompt template, and the acronyms will be extracted from each chunk.
 
         Parameters
         ----------
@@ -60,14 +83,12 @@ class AcronymExtractor(object):
 
         Returns
         -------
-        str
-            The extracted acronyms.
+        list
+            A list of tuples, where each tuple contains the acronym and its definition.
         """
-
         try:
             return self._nlp(text)._.acronyms
         except Exception as e:
-            
             # Extract the maximum context length from the error
             pattern = r"maximum context length is (\d+) tokens"
             match = re.search(pattern, e.args[0])
@@ -95,8 +116,9 @@ class AcronymExtractor(object):
                 except Exception as e:
                     self._logger.error(
                         f"-- -- Error processing chunk {i} of {len(text_chunks)}")
-                    self._logger.error(f"-- -- Size of chunk + promt: {len(chunk) + len(promt_text)}")
+                    self._logger.error(
+                        f"-- -- Size of chunk + promt: {len(chunk) + len(promt_text)}")
                     self._logger.error(f"-- -- Error processing chunk: {e}")
                     continue
-            
+
             return flatten(processed_chunks)
