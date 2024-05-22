@@ -48,21 +48,25 @@ if __name__ == "__main__":
         default="config/config.yaml",
         help="Path to config YAML file"
     )
-    parser.add_argument(
-        "--source",
-        default="../data/output4/data.parquet",
-        help="Path to source data file."
-    )
+
+    parser.add_argument('-s', '--source', help='Input parquet file', required=True)
+    parser.add_argument('-o', '--output', help='Output parquet file', required=True)
+
     
     args = parser.parse_args()
     
     # Create logger
     logger = logging.getLogger(__name__)
     
-    # Load config file
-    with open(args.config, "r") as f:
-        config = dict(yaml.safe_load(f))
-        
+
+    try:
+        # Load config file
+        with open(args.config, "r") as f:
+            config = dict(yaml.safe_load(f))
+    except Exception as E:
+         print ('error opening file: %s' % E)
+         exit()
+
     # Load pipeline
     pipe = config.get("pipe", [])
     
@@ -72,13 +76,18 @@ if __name__ == "__main__":
     # Create pipeline with options from config file
     options_pipe = config.get("options_pipe", {})
     nlp_pipe = NLPpipeline(**options_pipe)
-    
-    # Load data
-    df = pd.read_parquet(args.source)
-    df_aux = df.copy().iloc[0:5]
-    col_calculate_on = "raw_text"
-    print(df_aux)
-    
+
+
+    try:    
+        # Load data
+        df = pd.read_parquet(args.source)
+        df_aux = df.copy().iloc[0:5]
+        col_calculate_on = "raw_text"
+        print(df_aux)
+    except Exception as E:
+        print ('Error loading data, %s' % E)
+        exit()
+
     # Apply pipeline
     replace_acronyms = True if "acronyms" in pipe else False
     for element in pipe:
@@ -90,5 +99,11 @@ if __name__ == "__main__":
             col_calculate_on=col_calculate_on,
             replace_acronyms=replace_acronyms
         )
-    import pdb; pdb.set_trace()
-    
+
+    #saving data
+    try:
+        if 'raw_text_ACR' in df_aux.columns:
+            df_aux['raw_text_ACR']=df_aux['raw_text_ACR'].astype('str') 
+        df_aux.to_parquet (args.output)
+    except Exception as E:
+        print ('error saving data, %s' % E)

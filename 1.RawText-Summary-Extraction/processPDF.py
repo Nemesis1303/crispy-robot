@@ -15,7 +15,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--indir', help='Input directory name', required=True)
     parser.add_argument('-o', '--outdir', help='Output directory name', required=True)
-    parser.add_argument('-w', '--workers', help='number of workers', default=0)
+    parser.add_argument('-w', '--workers', help='number of workers', default=4)
     args = parser.parse_args()    
 
 
@@ -23,7 +23,7 @@ if __name__ == "__main__":
     #import ipdb ; ipdb.set_trace()
     #exit()
 
-    process = processPDF ( args.indir, args.outdir, args.workers)
+    process = processPDF ( args.indir, args.outdir, int(args.workers))
 
     now = datetime.now()
     start_time = time.time()

@@ -64,18 +64,7 @@ class processPDF:
             path_save.joinpath("images").mkdir(parents=True, exist_ok=True)
             path_save.joinpath("tables").mkdir(parents=True, exist_ok=True)
             
-            # TODO: This needs to be generic
-            
-            # instructions = \
-            #     """ 
-            #     You are a helpful AI assistant working with technical descriptions of air conditioner units. 
-                
-            #     Please summarize the technical description for the Roof-top air conditioner 680 by sections in such a way that the outputted text can be used as input for a topic modeling algorithm.
-            # """
-            
-            instructions = \
-            """You are a helpful AI assistant working with the generation of summaries of PDF documents. Please summarize the given document by sections in such a way that the outputted text can be used as input for a topic modeling algorithm. Dont start with 'The document can be summarized...' or 'The document is about...'. Just start with the first section of the document.
-            """
+
             
             # Create a PDFParser and parse the PDF file
             pdf_parser = PDFParser(
