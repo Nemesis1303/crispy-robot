@@ -1,3 +1,2 @@
 #!/bin/bash 
-python processPDF.py -i $INPUT_DIR -o $OUTPUT_DIR 
-python generateParquet.py -i $OUTPUT_DIR -p $PARQUET_FILE 
+python pipe.py  --source $INPUT_PARQUET –-output $OUTPUT_PARQUET 
