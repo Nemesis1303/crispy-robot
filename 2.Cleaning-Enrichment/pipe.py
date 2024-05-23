@@ -18,6 +18,9 @@ def cal_element_pipe(
     col_calculate_on,
     replace_acronyms=False
 ) -> pd.DataFrame:
+    
+    # Apply cleaning as first step
+    df = pipe.get_clean_text(df, col_calculate_on)
 
     if element == "lang_id":
         df = pipe.get_lang(df, col_calculate_on)
@@ -99,7 +102,6 @@ if __name__ == "__main__":
             col_calculate_on=col_calculate_on,
             replace_acronyms=replace_acronyms
         )
-
     #saving data
     try:
         if 'raw_text_ACR' in df_aux.columns:

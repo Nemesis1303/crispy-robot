@@ -129,6 +129,43 @@ class NLPpipeline(object):
             regex = re.compile(raw, flags=re.IGNORECASE)
             text = regex.sub(rep, text)
         return text
+    
+    def get_clean_text(
+        self,
+        df: pd.DataFrame,
+        col_calculate_on: str
+    ) -> None:
+        
+        def clean(text):
+            # Remove extra spaces, newlines, unnecessary punctuation
+            text = re.sub(r'\s+', ' ', text)
+            text = re.sub(r'\\n', ' ', text)
+            
+            # Remove URLs
+            text = re.sub(r'http\S+|www\S+', '', text)
+            
+            # Remove sequences of dots (e.g., "....." or " . . . . . ")
+            text = re.sub(r'\.{2,}', '', text)
+            text = re.sub(r'\s+\.\s+', ' ', text)
+            
+            # Remove copyright symbols
+            text = re.sub(r'©', '', text)
+            
+            # Remove any leading or trailing spaces
+            text = text.strip()
+            
+            return text
+        
+        self._logger.info(
+            f"-- -- Cleaning text before applying NLP pipeline...")
+        start_time = time.time()
+        
+        df[col_calculate_on] = df[col_calculate_on].apply(clean)
+
+        self._logger.info(
+            f'Cleaning tex finished in {(time.time() - start_time)}')
+        
+        return df
 
     def get_acronyms(
         self,
@@ -431,24 +468,25 @@ class NLPpipeline(object):
             embeddings = []
             for i, chunk in tqdm(enumerate(text_chunks)):
                 embedding = get_embedding(chunk)
-                if i == 0:
-                    embeddings = embedding
-                else:
-                    embeddings.append(embedding)
+                embeddings.append(embedding)
+            
             if len(embeddings) > 1:
                 embeddings = np.mean(embeddings, axis=0)
+            else:
+                embeddings = embeddings[0]
 
             # Convert to string to save space
-            embedding = ' '.join(str(x) for x in embedding)
-            return embedding
+            embedding_str = ' '.join(str(x) for x in embeddings)
+            return embedding_str
 
         col_save = f"{col_calculate_on}_EMBEDDINGS"
         df[col_save] = df[col_calculate_on].apply(encode_text)
 
         self._logger.info(
-            f"-- -- Embeddings extraction finished in {(time.time() - start_time)}")
+            f"-- -- Embeddings extraction finished in {(time.time() - start_time)} seconds")
 
         return df
+
 
     def get_ner_generic(
         self,
@@ -484,8 +522,7 @@ class NLPpipeline(object):
 
         # Download spaCy model if not already downloaded and load
         # Disable parser and NER to speed up processing
-        nlp = load_spacy(self._spaCy_model, exclude=[
-                         'lemmatization', 'parser'])
+        nlp = load_spacy(self._spaCy_model, exclude=['lemmatization', 'parser'])
 
         def get_ners(text):
             try:
