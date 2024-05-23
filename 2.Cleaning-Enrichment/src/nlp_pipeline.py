@@ -30,7 +30,15 @@ from spacy_download import load_spacy
 from gensim.models.phrases import Phrases
 import os
 import torch
-from langdetect import detect
+
+'''
+Detect language of a text
+'''
+#from langdetect import detect
+#en vez de langdetect, usamos fasttext que es más rápido y fiable.
+import fasttext
+from huggingface_hub import hf_hub_download
+
 from src.utils import split_into_chunks
 
 
@@ -79,6 +87,9 @@ class NLPpipeline(object):
         self._aggregate_embeddings = aggregate_embeddings
         self._use_gpu = use_gpu
         self._lemmas_cols = []
+        
+        model_path = hf_hub_download(repo_id="facebook/fasttext-language-identification", filename="model.bin")
+        self.model = fasttext.load_model(model_path)        
 
     def _loadSTW(
         self,
@@ -254,7 +265,7 @@ class NLPpipeline(object):
             """
 
             try:
-                lang = detect(x)
+                lang = self.model.predict (x)[0][0].replace('__label__','')
             except:
                 lang = 'Other'
             return lang
