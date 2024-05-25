@@ -11,39 +11,33 @@ This class implements a Natural Language Processing (NLP) pipeline to process te
 While the methods are thought to be called independenty, some methods depend on the output of others: the methods 'get_ngrams' and 'get_ner_generic' depend on the lemmas of the text column, so the lemmas MUST have been calculated before.
 
 
-Author: Lorena Calvo-Bartolomé
+Author: Lorena Calvo-Bartolomé, Saúl Blanco Fortes
 Date: 12/05/2024
 """
 
-import time
-import numpy as np
-import pandas as pd
 import logging
+import os
 import pathlib
 import re
-
-from tqdm import tqdm
-import contractions
-from sentence_transformers import SentenceTransformer
+import time
 from typing import List, Tuple
-from spacy_download import load_spacy
-from gensim.models.phrases import Phrases
-import os
-import torch
 
-'''
-Detect language of a text
-'''
-#from langdetect import detect
-#en vez de langdetect, usamos fasttext que es más rápido y fiable.
+import contractions
 import fasttext
+import numpy as np
+import pandas as pd
+import torch
+from gensim.models.phrases import Phrases
+from sentence_transformers import SentenceTransformer
+from spacy_download import load_spacy
+from tqdm import tqdm
+
+fasttext.FastText.eprint = lambda x: None
 from huggingface_hub import hf_hub_download
-
-from src.utils import split_into_chunks
-
-
 from src.acronym_extractor.acronym_extractor import AcronymExtractor
-from src.ner_specific_extractor.ner_specific_extractor import NERSpecificExtractor
+from src.ner_specific_extractor.ner_specific_extractor import \
+    NERSpecificExtractor
+from src.utils import split_into_chunks
 
 
 class NLPpipeline(object):
@@ -111,7 +105,7 @@ class NLPpipeline(object):
             [stopword for stw_df in stw_list for stopword in stw_df['stopwords']]
         self._stw_list = list(dict.fromkeys(stw_list))  # remove duplicates
         self._logger.info(
-            f"Stopwords list created with {len(stw_list)} items.")
+            f"-- -- Stopwords list created with {len(stw_list)} items.")
 
         return
 

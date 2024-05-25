@@ -6,8 +6,8 @@ The core logic of the pipeline is encapsulated in the `NLPpipeline` class, defin
 
 The NLP pipeline comprises the following steps:
 
-- **Acronyms Extraction**
 - **Language Detection**
+- **Acronyms Extraction**
 - **Lemmatization**
 - **N-grams Extraction**
 - **Contextual Embeddings Extraction**
@@ -53,6 +53,10 @@ The file `config/config.yaml` serves as the configuration hub for the NLP pipeli
    - **aggregate_embeddings**: When enabled, this feature calculates embeddings for large texts by truncating them into chunks matching the model's context size, then averages these chunk embeddings.
 
    - **use_gpu**: Whether to use GPU.
+  
+3. **Default Spacy models for each language (`langs_dft`):**
+   - **spaCy_model_dft_en**: Default SpaCy language model for text processing in English.
+   - **spaCy_model_dft_es**: Default SpaCy language model for text processing in Spanish.
 
 
 ### Module-specific Configuration
