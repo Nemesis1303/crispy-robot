@@ -63,13 +63,20 @@ class NLPpipeline(object):
 
         # Load stopwords
         if not stw_files_path:
-            stw_files_path = pathlib.Path(os.getcwd()) / "src" / "stw_lists"
+            stw_files_path = pathlib.Path(__file__).parent / "stw_lists"
+            if lang == "en":
+                stw_files_path = stw_files_path / "en"
+            elif lang == "es":
+                stw_files_path = stw_files_path / "es"
+            else:
+                self._logger.info(f"-- -- Language {lang} not supported. Existing...")
+                return
             stw_lsts = []
             for entry in stw_files_path.iterdir():
                 # check if it is a file
                 if entry.as_posix().endswith("txt"):
                     stw_lsts.append(entry)
-        self._loadSTW(stw_lsts)
+        self._loadSTW(stw_lsts,lang)
 
         self._spaCy_model = spaCy_model
         self._lang = lang
@@ -87,7 +94,8 @@ class NLPpipeline(object):
 
     def _loadSTW(
         self,
-        stw_files: List[pathlib.Path]
+        stw_files: List[pathlib.Path],
+        lang
     ) -> None:
         """
         Loads stopwords as list from files provided in the argument
@@ -105,7 +113,7 @@ class NLPpipeline(object):
             [stopword for stw_df in stw_list for stopword in stw_df['stopwords']]
         self._stw_list = list(dict.fromkeys(stw_list))  # remove duplicates
         self._logger.info(
-            f"-- -- Stopwords list created with {len(stw_list)} items.")
+            f"-- -- Stopwords list created with {len(stw_list)} {lang} items.")
 
         return
 
@@ -350,7 +358,7 @@ class NLPpipeline(object):
             return final_tokenized
 
         # Apply lemmatization to the text
-        self._logger.info(f"-- -- Extracting acronyms...")
+        self._logger.info(f"-- -- Extracting lemmas...")
         start_time = time.time()
         col_save = f"{col_calculate_on}_LEMMAS"
         df[col_save] = df[col_calculate_on].apply(do_lemmas)

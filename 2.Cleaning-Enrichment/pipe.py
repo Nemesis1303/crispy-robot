@@ -70,7 +70,7 @@ def cal_element_pipe(
     for df_, pipe in dfs:
         if element == "lang_id":
             continue  # Skip processing if the element is "lang_id"
-        if element == "acronyms":
+        elif element == "acronyms":
             df_ = pipe.get_acronyms(df_, col_calculate_on)
         elif element == "lemmas":
             df_ = pipe.get_lemmas(df_, col_calculate_on, replace_acronyms)
@@ -177,6 +177,7 @@ if __name__ == "__main__":
         sys.exit()
 
     # Apply pipeline
+    print(f"This is the pipe: {pipe}")
     replace_acronyms = True if "acronyms" in pipe else False
     for col_calculate_on in cols_calculate_on:
         logger.info(f"-- -- Preprocessing column {col_calculate_on}...")
@@ -192,6 +193,9 @@ if __name__ == "__main__":
                 replace_acronyms=replace_acronyms,
                 logger=logger
             )
+            
+    logger.info(f"-- -- New columns of the dataframe: {df.columns}")
+    logger.info(f"-- -- Printing sample of the preprocessed data: {df.head()}")
     # Save data
     try:
         if 'raw_text_ACR' in df.columns:
