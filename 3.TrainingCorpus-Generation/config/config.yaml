@@ -1,0 +1,19 @@
+mode: 2 # 0,1,2,3
+preproc: True
+
+doc_selector:
+  lemmas_col: raw_text_LEMMAS
+  ner_col: raw_text_SPEC_NERS
+  target_label: DRUG
+  remove_empty: True
+
+preprocessor:
+  exec:
+    mode: manual # manual or auto
+    path_stw: wdlists/stw
+    path_eq : wdlists/eqs
+  object_creation:
+    min_lemas: 15
+    no_below: 10
+    no_above: 0.6
+    keep_n: 100000
