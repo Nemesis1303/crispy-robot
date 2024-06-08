@@ -34,26 +34,32 @@ def main(config: Dict[str, Any], logger: logging.Logger, df: pd.DataFrame) -> pd
     pd.DataFrame
         Preprocessed DataFrame.
     """
-    mode = config.get('mode', 0)
+    doc_selector_mode = config.get('doc_selector_mode', 0)
     preproc = config.get('preproc', True)
     dc = DocSelector(logger=logger)
 
     try:
-        if mode == 0:  # filter docs by ner with frequency
-            df = dc.filter_docs_by_ners(df, with_freq=True, **config['doc_selector'])
+        if doc_selector_mode == 0:  # filter docs by ner with frequency
+            df = dc.filter_docs_by_ners(
+                df, with_freq=True,
+                **{k: v for k, v in config['doc_selector'].items() if k != 'min_count'}
+            )
             preproc = False
-        elif mode == 1:  # filter docs by ner without frequency
-            df = dc.filter_docs_by_ners(df, with_freq=False, **config['doc_selector'])
+        elif doc_selector_mode == 1:  # filter docs by ner without frequency
+            df = dc.filter_docs_by_ners(
+                df, with_freq=False, 
+                **{k: v for k, v in config['doc_selector'].items() if k != 'min_count'}
+            )
             col_preproc = config['doc_selector']['target_label'] + "_NER_IN_ROW"
-        elif mode == 2:  # filter docs if ner
+        elif doc_selector_mode == 2:  # filter docs if ner
             df = dc.filter_docs_if_ner(
                 df, **{k: v for k, v in config['doc_selector'].items() if k != 'remove_empty'}
             )
             col_preproc = config['doc_selector']['lemmas_col']
-        elif mode == 3:  # just use lemmas
+        elif doc_selector_mode == 3:  # just use lemmas
             col_preproc = config['doc_selector']['lemmas_col']
         else:
-            raise ValueError(f"Mode {mode} not recognized")
+            raise ValueError(f"Mode {doc_selector_mode} not recognized")
 
         if preproc:
             if config["preprocessor"]["exec"]["mode"] == "manual":
@@ -71,7 +77,7 @@ def main(config: Dict[str, Any], logger: logging.Logger, df: pd.DataFrame) -> pd
                 eq_files=eqs,
                 **config["preprocessor"]["object_creation"]
             )
-
+            
             df = pc.preproc(df, col_preproc)
 
         return df
@@ -87,12 +93,13 @@ def main(config: Dict[str, Any], logger: logging.Logger, df: pd.DataFrame) -> pd
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Generate a corpus from a set of documents.")
     parser.add_argument('--config', type=str, help='Path to the configuration file.', default="config/config.yaml")
-    parser.add_argument('--mode', type=int, help='Mode of operation.')
+    parser.add_argument('--doc_selector_mode', type=int, help='Mode of operation for the Document Selection task.')
     parser.add_argument('--preproc', type=bool, help='Enable preprocessing.')
     parser.add_argument('--lemmas_col', type=str, help='Column name with the lemmas of the documents.')
     parser.add_argument('--ner_col', type=str, help='Column name with the NERs of the documents.')
     parser.add_argument('--target_label', type=str, help='Target NER label to filter the documents.')
     parser.add_argument('--remove_empty', type=bool, help='Remove empty documents.')
+    parser.add_argument('--min_count', type=int, help='Minimum number of NERs of the target label to keep the document.')
     parser.add_argument('-s', '--source', help='Input parquet file', required=True)
     parser.add_argument('-o', '--output', help='Output parquet file', required=True)
     args = parser.parse_args()
@@ -108,8 +115,8 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # Override config values with command-line arguments if provided
-    if args.mode is not None:
-        config['mode'] = args.mode
+    if args.doc_selector_mode is not None:
+        config['doc_selector_mode'] = args.doc_selector_mode
     if args.preproc is not None:
         config['preproc'] = args.preproc
     if 'doc_selector' not in config:
@@ -122,6 +129,8 @@ if __name__ == '__main__':
         config['doc_selector']['target_label'] = args.target_label
     if args.remove_empty:
         config['doc_selector']['remove_empty'] = args.remove_empty
+    if args.min_count:
+        config['doc_selector']['min_count'] = args.min_count
 
     try:
         df = pd.read_parquet(args.source)
@@ -133,7 +142,7 @@ if __name__ == '__main__':
     logger.info(f"Data columns: {df.columns}")
 
     df = main(config, logger, df)
-
+    
     try:
         df.to_parquet(args.output)
     except Exception as e:
