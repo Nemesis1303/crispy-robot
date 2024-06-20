@@ -1,4 +1,4 @@
-FROM python39_0 
+FROM python39_2
 
 WORKDIR /app
 COPY . /app

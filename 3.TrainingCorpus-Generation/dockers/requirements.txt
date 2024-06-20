@@ -1,0 +1,6 @@
+gensim
+pandas
+PyYAML
+scipy==1.12
+fastparquet
+pyarrow
