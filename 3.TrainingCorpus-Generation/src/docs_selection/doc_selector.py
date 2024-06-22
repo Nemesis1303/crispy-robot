@@ -72,7 +72,7 @@ class DocSelector:
                 f"No documents contain the target label '{target_label}'. Exiting..."
             )
             return df
-
+        
         def filter_ners_in_row(row: pd.Series, target_label: str, lemmas_col: str, ner_col: str, with_freq: bool) -> Union[str, Dict[str, int]]:
             """
             Filter the NERs in a row of the DataFrame.
@@ -95,21 +95,41 @@ class DocSelector:
             str or dict
                 If with_freq is False, return a string with the filtered words. If with_freq is True, return a dictionary with the words and their frequency.
             """
+            
+            """
             words = row[lemmas_col].split()
 
             if with_freq:
                 word_freq = Counter(words)
                 filtered_ners = [word for word,
-                                 label in row[ner_col] if label == target_label]
+                                label in row[ner_col] if label == target_label]
                 filtered_words = {word: word_freq[word]
-                                  for word in filtered_ners if word in word_freq}
+                                for word in filtered_ners if word in word_freq}
                 return filtered_words
             else:
                 filtered_ners = [word for word,
-                                 label in row[ner_col] if label == target_label]
+                                label in row[ner_col] if label == target_label]
                 filtered_words = [
                     word for word in words if word in filtered_ners]
                 return ' '.join(filtered_words)
+            """
+            words = row[lemmas_col].split()
+            words_lower = [word.lower() for word in words]
+
+            # Ensure ner_col is a list of tuples and normalize case
+            ner_list = [(ner[0].lower(), ner[1]) for ner in row[ner_col]]
+
+            if with_freq:
+                word_freq = Counter(words_lower)
+                print(f"Word Frequencies: {word_freq}")
+                filtered_ners = [word.lower() for word, label in ner_list if label == target_label]
+                filtered_words = {word: word_freq[word] for word in filtered_ners if word in word_freq}
+                return filtered_words
+            else:
+                filtered_ners = [word.lower() for word, label in ner_list if label == target_label]
+                filtered_words = [word for word in words if word.lower() in filtered_ners]
+                return ' '.join(filtered_words)
+
 
         self._logger.info(
             f"Filtering NERs in the documents with{'out' if not with_freq else ''} frequency..."

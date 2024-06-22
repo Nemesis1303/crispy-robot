@@ -6,9 +6,8 @@ This script generates a corpus from a set of documents by filtering the document
 
 import argparse
 import logging
-import os
 import sys
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 import pandas as pd
 import yaml
@@ -142,6 +141,8 @@ if __name__ == '__main__':
     logger.info(f"Data columns: {df.columns}")
 
     df = main(config, logger, df)
+    
+    import pdb; pdb.set_trace()
     
     try:
         df.to_parquet(args.output)

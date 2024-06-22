@@ -157,7 +157,8 @@ class Preprocessor:
         start_time = time.time()
         
         # Compute tokens, clean them, and filter out documents with less than the minimum number of lemmas
-        df['tr_tokens'] = df[colname].apply(tkz_clean_str)
+        df = df.copy() 
+        df.loc[:, 'tr_tokens'] = df[colname].apply(tkz_clean_str)
         df = df[df['tr_tokens'].apply(len) >= self._min_lemas]
 
         # Gensim dictionary creation
