@@ -121,7 +121,6 @@ class DocSelector:
 
             if with_freq:
                 word_freq = Counter(words_lower)
-                print(f"Word Frequencies: {word_freq}")
                 filtered_ners = [word.lower() for word, label in ner_list if label == target_label]
                 filtered_words = {word: word_freq[word] for word in filtered_ners if word in word_freq}
                 return filtered_words

@@ -141,9 +141,7 @@ if __name__ == '__main__':
     logger.info(f"Data columns: {df.columns}")
 
     df = main(config, logger, df)
-    
-    import pdb; pdb.set_trace()
-    
+        
     try:
         df.to_parquet(args.output)
     except Exception as e:
