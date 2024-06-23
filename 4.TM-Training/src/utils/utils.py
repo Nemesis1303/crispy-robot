@@ -41,29 +41,6 @@ def pickler(file: str, ob: object) -> int:
         pickle.dump(ob, f)
     return 0
 
-def split_into_chunks(text: str, max_length: int) -> List[str]:
-    """
-    Split a text into chunks of a specified maximum length.
-
-    Parameters
-    ----------
-    text : str
-        The text to be split into chunks.
-    max_length : int
-        The maximum length of each chunk.
-
-    Returns
-    -------
-    list of str
-        A list containing the text split into chunks.
-    """
-    if len(text) > max_length:
-        texts_splits = [text[i:i + max_length]
-                        for i in range(0, len(text), max_length)]
-    else:
-        texts_splits = [text]
-    return texts_splits
-
 def file_lines(fname: Path) -> int:
     """
     Count number of lines in file

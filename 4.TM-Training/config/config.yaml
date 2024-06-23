@@ -1,0 +1,28 @@
+ntopics: 20
+model_type: MalletLda
+text_col: tr_tokens
+raw_text_col: raw_text
+
+dft_config_models:
+  mallet:
+    # Regular expression for token identification
+    token_regexp: "[\\p{L}\\p{N}][\\p{L}\\p{N}\\p{P}]*\\p{L}"
+    # Settings for mallet training and doctopics postprocessing
+    alpha: 5
+    optimize_interval: 10
+    num_threads: 4
+    num_iterations: 1000
+    doc_topic_thr: 0
+    num_iterations_inf: 100
+  bertopic: 
+    no_below: 1
+    no_above: 1
+    sbert_model: paraphrase-distilroberta-base-v2
+    umap_n_components: 5
+    umap_n_neighbors: 15
+    umap_min_dist: 0.0
+    umap_metric: cosine
+    hdbscan_min_cluster_size: 10
+    hdbscan_metric: euclidean
+    hdbscan_cluster_selection_method: eom
+    hbdsan_prediction_data: True

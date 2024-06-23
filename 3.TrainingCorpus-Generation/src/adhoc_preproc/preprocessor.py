@@ -150,7 +150,7 @@ class Preprocessor:
                     self._equivalences[el] if el in self._equivalences else el for el in cleantext
                 ]
                 # Remove stopwords again in case equivalences introduced new stopwords
-                cleantext = [el for el in cleantext if el not in self._stopwords]
+                cleantext = " ".join([el for el in cleantext if el not in self._stopwords])
             return cleantext
 
         self._logger.info("Preprocessing documents...")
@@ -162,7 +162,7 @@ class Preprocessor:
         df = df[df['tr_tokens'].apply(len) >= self._min_lemas]
 
         # Gensim dictionary creation
-        tr_tokens = df['tr_tokens'].values.tolist()
+        tr_tokens = [doc.split() for doc in df["tr_tokens"]]
         gensim_dict = corpora.Dictionary(tr_tokens)
 
         # Remove words that appear in less than no_below documents, in more than no_above, and keep at most keep_n most frequent terms

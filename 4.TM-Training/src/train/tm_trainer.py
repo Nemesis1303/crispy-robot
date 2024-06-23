@@ -1,4 +1,6 @@
-import argparse
+"""
+This module contains classes for training topic models. More specifically, it contains classes for training Mallet LDA and BERTopic models, grouped under the TMTrainer abstract class. Any new topic model trainer should inherit from TMTrainer and implement the abstract methods train() and infer().
+"""
 import logging
 import os
 import pathlib
@@ -11,27 +13,21 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 import yaml
 from gensim.corpora import Dictionary
 from scipy import sparse
 from sklearn.preprocessing import normalize
 import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import tomotopy as tp
+from sentence_transformers import SentenceTransformer
+from cuml.manifold import UMAP
+from hdbscan import HDBSCAN
 from bertopic import BERTopic
+from sklearn.feature_extraction.text import CountVectorizer
 from bertopic.representation import KeyBERTInspired, MaximalMarginalRelevance
 from bertopic.vectorizers import ClassTfidfTransformer
-from gensim.corpora import Dictionary
-from hdbscan import HDBSCAN
-from sentence_transformers import SentenceTransformer
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.preprocessing import normalize
-from tqdm import tqdm
-from umap import UMAP
+from sparse_dot_topn import awesome_cossim_topn
 
-from src.utils.utils import file_lines, get_embeddings_from_str, pickler, init_logger
+from src.utils.utils import file_lines, get_embeddings_from_str, pickler
 
 class TMTrainer(ABC):
     """
@@ -44,7 +40,7 @@ class TMTrainer(ABC):
         topn: int = 15,
         model_path: str = None,
         logger: logging.Logger = None,
-        path_logs: pathlib.Path = pathlib.Path(__file__).parent.parent.parent / "data/logs"
+
     ) -> None:
         """
         Initialize the TMTrainer class.
@@ -64,10 +60,13 @@ class TMTrainer(ABC):
         """
         
         # Initialize logger
-        self._logger = logger if logger else init_logger(__name__, path_logs)
+        if logger is None:
+            self._logger = logging.getLogger(__name__)
+        else:
+            self._logger = logger
 
         # Create folder for saving model
-        self.model_path = pathlib.Path(model_path)
+        self.model_path = pathlib.Path(model_path) if model_path else pathlib.Path(__file__).parent / "model"
         if self.model_path.exists():
             self._logger.info(
                 f"-- -- Model path {self.model_path} already exists. Saving a copy..."
@@ -144,14 +143,23 @@ class TMTrainer(ABC):
         
         bow = self.get_bow(vocab)
         bow = sparse.csr_matrix(bow, copy=True)
+        
+        sims, sim_rpr = self.calculate_sims(thetas)
 
         np.save(self.model_path.joinpath('alphas.npy'), alphas)
         np.save(self.model_path.joinpath('betas.npy'), betas)
         sparse.save_npz(self.model_path.joinpath('thetas.npz'), thetas)
         sparse.save_npz(self.model_path.joinpath('bow.npz'), bow)
+        sparse.save_npz(self.model_path.joinpath('distances.npz'), sims)
+        with open(self.model_path.joinpath('distances.txt'), 'w') as f:
+            for item in sim_rpr:
+                f.write("%s\n" % item)
+        
         with self.model_path.joinpath('vocab.txt').open('w', encoding='utf8') as fout:
             fout.write('\n'.join(vocab))
 
+        self._logger.info(f"-- -- TOPIC DESCRIPTIONS:")
+        self._logger.info('\n'.join([f"TOPIC {id_tpc}: {' '.join(topic)}" for id_tpc, topic in enumerate(keys)]))
         with self.model_path.joinpath('tpc_descriptions.txt').open('w', encoding='utf8') as fout:
             fout.write('\n'.join([' '.join(topic) for topic in keys]))
 
@@ -175,7 +183,6 @@ class TMTrainer(ABC):
             return np.array([])
 
         vocab_w2id = {wd: id_wd for id_wd, wd in enumerate(vocab)}
-        vocab_id2w = {str(id_wd): wd for id_wd, wd in enumerate(vocab)}
 
         gensim_dict = Dictionary(self.train_data)
         bow = [gensim_dict.doc2bow(doc) for doc in self.train_data]
@@ -197,12 +204,50 @@ class TMTrainer(ABC):
         self._logger.info(f"-- -- BoW matrix shape: {bow_mat.shape}")
 
         return bow_mat
+    
+    def calculate_sims(
+        self,
+        thetas: sparse.csr_matrix,
+        topn:int=300,
+        lb:float=0):
+        """Given the path to a TMmodel, it calculates the similarities between documents and saves them in a sparse matrix.
+
+        Parameters
+        ----------
+        logger : logging.Logger
+            Logger.
+        thetas : sparse.csr_matrix
+            The doc-topics matrix.
+        topn : int, optional
+            Number of top similar documents to be saved. The default is 300.
+        lb : float, optional
+            Lower bound for the similarity. The default is 0.6.
+        """
+        t_start = time.perf_counter()
+        thetas_sqrt = np.sqrt(thetas)
+        thetas_col = thetas_sqrt.T
+        
+        self._logger.info(f"-- -- Calculating similarities between documents with topn={topn} and lb={lb}...")
+        sims = awesome_cossim_topn(thetas_sqrt, thetas_col, topn, lb)
+        t_end = time.perf_counter()
+        t_total = (t_end - t_start)/60
+        self._logger.info(f"-- -- Similarities calculated in: {t_total}")
+        
+        self._logger.info(f"-- -- Getting string representation of similarities...")
+        non_zero_indices = sparse.triu(sims, k=1).nonzero() # non-zero elements indices
+        sim_str = \
+            [' '.join([f"{self.ids_corpus[col]}|{sims[row, col]}" for col in non_zero_indices[1]
+                        [non_zero_indices[0] == row]][1:]) for row in range(sims.shape[0])]
+        
+        return sims, sim_str
+                
 
     def _load_train_data(
         self,
         path_to_data: str,
         get_embeddings: bool = False,
-        text_data: str = "tokenized_text"
+        text_data: str = "tr_tokens",
+        raw_text_data: str = "raw_text"
     ) -> None:
         """
         Load the training data.
@@ -213,7 +258,7 @@ class TMTrainer(ABC):
             Path to the training data.
         get_embeddings : bool, default=False
             Whether to load embeddings from the data.
-        text_data : str, default='tokenized_text'
+        text_data : str, default='tr_tokens'
             Column name containing the text data.
         """
         
@@ -221,25 +266,30 @@ class TMTrainer(ABC):
         self.text_col = text_data
 
         try:
-            if path_to_data.suffix == ".parquet":
-                df = pd.read_parquet(path_to_data)
-            elif path_to_data.suffix in [".json", ".jsonl"]:
-                df = pd.read_json(path_to_data, lines=True)
-            else:
-                self._logger.error(f"-- -- Unrecognized file extension for data path. Exiting...")
-                return
+            df = pd.read_parquet(path_to_data)
         except Exception as e:
-            self._logger.error(f"-- -- An exception occurred when loading data: {e}. Exiting...")
+            self._logger.error(f"-- -- Error loading data: {e}. Exiting...")
             return
 
         self.df = df
-        self.train_data = [doc.split() for doc in df[text_data]]
+        try:
+            self.train_data = [doc.split() for doc in df[text_data]]
+        except KeyError:
+            self._logger.error(f"-- -- Column {text_data} not found in the data. Exiting...")
+            return
+        try:
+            self.ids_corpus = df.pdf_id.values.tolist()
+        except KeyError:
+            self._logger.error(f"-- -- Column pdf_id not found in the data. Exiting...")
+            return
+        
         self._logger.info(f"-- -- Loaded processed data from {path_to_data}")
 
         if get_embeddings:
             if "embeddings" not in df.columns:
-                self._logger.info(f"-- -- Embeddings required but not present in data. Exiting...")
-                return
+                self._logger.warning(f"-- -- Embeddings not present in data. They will be calculated at training time.")
+                self.embeddings = None
+                self.raw_text = [doc.split() for doc in df[raw_text_data]]
             else:
                 self.embeddings = get_embeddings_from_str(df, self._logger)
                 self._logger.info(f"-- -- Loaded embeddings from the DataFrame")
@@ -278,7 +328,6 @@ class MalletLDATrainer(TMTrainer):
         topn: int = 15,
         model_path: str = None,
         logger: logging.Logger = None,
-        path_logs: pathlib.Path = pathlib.Path(__file__).parent.parent
     ) -> None:
         """
         Initialization method.
@@ -307,11 +356,9 @@ class MalletLDATrainer(TMTrainer):
             Path to save the trained model.
         logger : logging.Logger, optional
             Logger object to log activity.
-        path_logs : pathlib.Path, optional
-            Path for saving logs.
         """
 
-        super().__init__(num_topics, topn, model_path, logger, path_logs)
+        super().__init__(num_topics, topn, model_path, logger)
 
         self.mallet_path = pathlib.Path(mallet_path)
         self.alpha = alpha
@@ -325,7 +372,7 @@ class MalletLDATrainer(TMTrainer):
             self._logger.error(f'-- -- Provided mallet path is not valid -- Stop')
             sys.exit()
 
-    def train(self, path_to_data: str, text_col: str = "tokenized_text") -> float:
+    def train(self, path_to_data: str, text_col: str = "tr_tokens") -> float:
         """
         Train the topic model and save the data to the specified path.
 
@@ -333,7 +380,7 @@ class MalletLDATrainer(TMTrainer):
         ----------
         path_to_data : str
             Path to the training data.
-        text_col : str, default='tokenized_text'
+        text_col : str, default='tr_tokens'
             Column name containing the text data.
 
         Returns
@@ -544,152 +591,6 @@ class MalletLDATrainer(TMTrainer):
 
         return thetas32
 
-class TomotopyLdaModel(TMTrainer):
-    """
-    Trainer for Tomotopy LDA topic model.
-    """
-
-    def __init__(
-        self,
-        num_topics: int = 35,
-        topn: int = 15,
-        num_iters: int = 2000,
-        model_path: str = None,
-        logger: logging.Logger = None,
-        path_logs: pathlib.Path = pathlib.Path(__file__).parent.parent
-    ) -> None:
-        """
-        Initialize the TomotopyLdaModel class.
-
-        Parameters
-        ----------
-        num_topics : int, default=35
-            Number of topics to generate.
-        topn : int, default=15
-            Number of top words per topic.
-        num_iters : int, default=2000
-            Number of iterations for training.
-        model_path : str, optional
-            Path to save the trained model.
-        logger : logging.Logger, optional
-            Logger object to log activity.
-        path_logs : pathlib.Path, optional
-            Path for saving logs.
-        """
-
-        super().__init__(num_topics, topn, model_path, logger, path_logs)
-
-        # Initialize specific parameters for Tomotopy LDA
-        self.num_iters = num_iters
-
-    def train(self, path_to_data: str, text_col: str = "tokenized_text") -> float:
-        """
-        Train the topic model and save the data to the specified path.
-
-        Parameters
-        ----------
-        path_to_data : str
-            Path to the training data.
-        text_col : str, default='tokenized_text'
-            Column name containing the text data.
-
-        Returns
-        -------
-        float
-            Time taken to train the model.
-        """
-
-        self._load_train_data(path_to_data, get_embeddings=False, text_data=text_col)
-        t_start = time.perf_counter()
-
-        self._logger.info("-- -- Creating TomotopyLDA object and adding docs...")
-        self.model = tp.LDAModel(k=self.num_topics, tw=tp.TermWeight.ONE)
-        [self.model.add_doc(doc) for doc in self.train_data]
-
-        self._logger.info(f"-- -- Training TomotopyLDA model with {self.num_topics} topics...")
-        pbar = tqdm(total=self.num_iters, desc='Training Progress')
-        for i in range(0, self.num_iters, 10):
-            self.model.train(10)
-            pbar.update(10)
-            if i % 300 == 0 and i > 0:
-                topics = self.print_topics(verbose=False)
-                pbar.write(f'Iteration: {i}, Log-likelihood: {self.model.ll_per_word}, Perplexity: {self.model.perplexity}')
-        pbar.close()
-
-        self._logger.info("-- -- Calculating topics and distributions...")
-        probs = [d.get_topic_dist() for d in self.model.docs]
-        thetas = np.array(probs)
-        self._logger.info(f"-- -- Thetas shape: {thetas.shape}")
-
-        topic_dist = [self.model.get_topic_word_dist(k) for k in range(self.num_topics)]
-        betas = np.array(topic_dist)
-        self._logger.info(f"-- -- Betas shape: {betas.shape}")
-
-        keys = self.print_topics(verbose=False)
-        self.maked_docs = [self.model.make_doc(doc) for doc in self.train_data]
-        vocab = [word for word in self.model.used_vocabs]
-
-        t_end = time.perf_counter() - t_start
-
-        self._save_model_results(thetas, betas, vocab, keys)
-        self._save_init_params_to_yaml()
-
-        return t_end
-
-    def print_topics(self, verbose: bool = False) -> list:
-        """
-        Print the list of topics for the topic model.
-
-        Parameters
-        ----------
-        verbose : bool, optional
-            If True, print the topics to the console, by default False.
-
-        Returns
-        -------
-        list
-            List with the keywords for each topic.
-        """
-
-        keys = [[tup[0] for tup in self.model.get_topic_words(k, self.topn)] for k in range(self.model.k)]
-
-        if verbose:
-            for k, words in enumerate(keys):
-                print(f"Topic {k}: {words}")
-        
-        return keys
-
-
-    def infer(self, docs: List[str]) -> np.ndarray:
-        """
-        Perform inference on unseen documents.
-
-        Parameters
-        ----------
-        docs : List[str]
-            List of documents to perform inference on.
-
-        Returns
-        -------
-        np.ndarray
-            Array of inferred thetas.
-        """
-
-        docs, _ = super().infer(docs)
-
-        self._logger.info("-- -- Performing inference on unseen documents...")
-        docs_tokens = [doc.split() for doc in docs]
-
-        self._logger.info("-- -- Adding docs to TomotopyLDA...")
-        doc_inst = [self.model.make_doc(text) for text in docs_tokens]
-
-        self._logger.info("-- -- Inferring thetas...")
-        topic_prob, log_ll = self.model.infer(doc_inst)
-        thetas = np.array(topic_prob)
-        self._logger.info(f"-- -- Inferred thetas shape {thetas.shape}")
-
-        return thetas
-
 class BERTopicTrainer(TMTrainer):
     """
     Trainer for the BERTopic Topic Model.
@@ -713,7 +614,6 @@ class BERTopicTrainer(TMTrainer):
         hdbscan_cluster_selection_method: str = 'eom',
         hbdsan_prediction_data: bool = True,
         logger: logging.Logger = None,
-        path_logs: pathlib.Path = pathlib.Path(__file__).parent.parent
     ):
         """
         Initialization method.
@@ -752,11 +652,9 @@ class BERTopicTrainer(TMTrainer):
             If True, the prediction data is used for HDBSCAN.
         logger : logging.Logger, optional
             Logger object to log activity.
-        path_logs : Path, optional
-            Path for saving logs.
         """
 
-        super().__init__(num_topics, topn, model_path, logger, path_logs)
+        super().__init__(num_topics, topn, model_path, logger)
 
         self.sbert_model = sbert_model
         self.no_below = no_below
@@ -780,7 +678,7 @@ class BERTopicTrainer(TMTrainer):
             f"(?![a-zA-Z\u00C0-\u024F\d])"
         )
 
-    def train(self, path_to_data: str, text_col: str = "tokenized_text") -> float:
+    def train(self, path_to_data: str, text_col: str = "tr_tokens", raw_text_data: str = "raw_text") -> float:
         """
         Train the topic model and save the data to the specified path.
 
@@ -788,8 +686,9 @@ class BERTopicTrainer(TMTrainer):
         ----------
         path_to_data : str
             Path to the training data.
-        text_col : str, default='tokenized_text'
+        text_col : str, default='tr_tokens'
             Column name containing the text data.
+        raw_text_data: str, defautl='raw_text'
 
         Returns
         -------
@@ -797,7 +696,7 @@ class BERTopicTrainer(TMTrainer):
             Time taken to train the model.
         """
 
-        self._load_train_data(path_to_data, get_embeddings=True, text_data=text_col)
+        self._load_train_data(path_to_data, get_embeddings=True, text_data=text_col, raw_text_data=raw_text_data)
         
         t_start = time.perf_counter()
 
@@ -805,10 +704,10 @@ class BERTopicTrainer(TMTrainer):
 
         if self.embeddings is not None:
             self._logger.info("-- -- Using pre-trained embeddings from the dataset...")
-            self._embedding_model = None
         else:
             self._logger.info(f"-- -- Creating SentenceTransformer model with {self.sbert_model}...")
-            self._embedding_model = SentenceTransformer(self.sbert_model)
+        
+        self._embedding_model = SentenceTransformer(self.sbert_model)
 
         self._umap_model = UMAP(
             n_components=self.umap_n_components,
@@ -843,23 +742,26 @@ class BERTopicTrainer(TMTrainer):
             language="english",
             top_n_words=self.topn,
             nr_topics=self.num_topics,
+            umap_model=self._umap_model,
             embedding_model=self._embedding_model,
             verbose=True
         )
         
         self._logger.info(f"-- -- Training BERTopic model with {self.num_topics} topics... ")
 
-        texts = [" ".join(doc) for doc in self.train_data]
+        
         if self.embeddings is not None:
+            texts = [" ".join(doc) for doc in self.train_data]
             _, probs = self._model.fit_transform(texts, self.embeddings)
         else:
+            texts = [" ".join(doc) for doc in self.raw_text]
             _, probs = self._model.fit_transform(texts)
 
-        thetas_approx, _ = self._model.approximate_distribution(texts)
+        thetas_approx, _ = self._model.approximate_distribution(texts, use_embedding_model=True)
         self._logger.info(f"-- -- Thetas shape: {thetas_approx.shape}")
 
         betas = self._model.c_tf_idf_.toarray()
-        betas = betas[:1] #drout outlier topic and keep (K-1, V) matrix
+        betas = betas[1:, :] #drout outlier topic and keep (K-1, V) matrix
         self._logger.info(f"-- -- Betas shape: {betas.shape}")
         vocab = self._model.vectorizer_model.get_feature_names_out()
 
@@ -897,82 +799,3 @@ class BERTopicTrainer(TMTrainer):
         self._logger.info(f"-- -- Inferred thetas shape {thetas.shape}")
 
         return thetas
-
-def main():
-    
-    def create_model(model_name, **kwargs):
-        # Map model names to corresponding classes
-        trainer_mapping = {
-            'MalletLda': MalletLDATrainer,
-            'TomotopyLda': TomotopyLdaModel,
-            'BERTopic': BERTopicTrainer,
-        }
-
-        # Retrieve the class based on the model name
-        trainer_class = trainer_mapping.get(model_name)
-
-        # Check if the model name is valid
-        if trainer_class is None:
-            raise ValueError(f"Invalid trainer name: {model_name}")
-
-        # Create an instance of the trainer class
-        trainer_instance = trainer_class(**kwargs)
-
-        return trainer_instance
-    
-    argparser = argparse.ArgumentParser()
-    argparser.add_argument(
-        "--corpus_file",
-        help="Path to the corpus file in txt format",
-        type=str,
-        default="/export/usuarios_ml4ds/lbartolome/Repos/umd/fluffy-train/data/train.metadata.enriched.parquet",
-        required=False
-    )
-    argparser.add_argument(
-        "--model_path",
-        help="Path to the corpus file in txt format",
-        type=str,
-        default="/export/usuarios_ml4ds/lbartolome/Repos/umd/theta-evaluation/data/modeltest",
-        required=False
-    )
-    argparser.add_argument(
-        "--trainer_type",
-        help="Trainer to be used (MalletLda, TomotopyLda, or BERTopic)",
-        type=str,
-        default="MalletLda",
-        required=False
-    )
-    argparser.add_argument(
-        "--num_topics",
-        help="number of topics to train the model with",
-        type=int,
-        default=50,
-        required=False
-    )
-    argparser.add_argument(
-        "--text_col",
-        help="Column of the dataframe with the train data.",
-        type=str,
-        default="tokenized_text",
-        required=False
-    )
-    
-    args = argparser.parse_args()
-    
-    
-    params = {k: v for k, v in vars(args).items()
-              if v is not None and k not in ["corpus_file", "trainer_type", "text_col"]}
-
-    # Create a trainer instance of type args.trainer_type
-    trainer = create_model(args.trainer_type, **params)
-    
-    # Fit the model
-    training_time = trainer.train(args.corpus_file, args.text_col)
-  
-    
-    # Print the training time
-    print(f"Training time: {training_time} seconds")
-
-
-if __name__ == "__main__":
-    main()
