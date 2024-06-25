@@ -142,7 +142,7 @@ if __name__ == '__main__':
         
     df = main(config, logger, df)
     
-    import pdb; pdb.set_trace()
+    #import pdb; pdb.set_trace()
     
         
     try:
