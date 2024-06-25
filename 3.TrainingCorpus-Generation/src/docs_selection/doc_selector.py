@@ -6,10 +6,9 @@ This module contains the DocSelector class to filter documents by Named Entities
 """
 
 from collections import Counter
-import logging
+import logging  
 import time
-from typing import Any, Dict, Union
-
+from typing import Any, Dict, List, Union
 import pandas as pd
 
 
@@ -95,38 +94,38 @@ class DocSelector:
             str or dict
                 If with_freq is False, return a string with the filtered words. If with_freq is True, return a dictionary with the words and their frequency.
             """
-            
-            """
-            words = row[lemmas_col].split()
-
-            if with_freq:
-                word_freq = Counter(words)
-                filtered_ners = [word for word,
-                                label in row[ner_col] if label == target_label]
-                filtered_words = {word: word_freq[word]
-                                for word in filtered_ners if word in word_freq}
-                return filtered_words
-            else:
-                filtered_ners = [word for word,
-                                label in row[ner_col] if label == target_label]
-                filtered_words = [
-                    word for word in words if word in filtered_ners]
-                return ' '.join(filtered_words)
-            """
             words = row[lemmas_col].split()
             words_lower = [word.lower() for word in words]
 
             # Ensure ner_col is a list of tuples and normalize case
-            ner_list = [(ner[0].lower(), ner[1]) for ner in row[ner_col]]
+            ner_words = [ner[0].replace(' ', '_').lower() for ner in row[ner_col] if ner[1] == target_label]
 
+            # Merge words that appear as separated in ner_words
+            def merge_words(words: List[str], modified_list: List[str]) -> List[str]:
+                """
+                Merge consecutive words in the list if their combined form with an underscore is present in the modified list.
+                """
+                merged = []
+                skip_next = False
+                for i in range(len(words)):
+                    if skip_next:
+                        skip_next = False
+                        continue
+                    if i < len(words) - 1 and f"{words[i]}_{words[i+1]}" in modified_list:
+                        merged.append(f"{words[i]}_{words[i+1]}")
+                        skip_next = True
+                    else:
+                        merged.append(words[i])
+                return merged
+            merged_words = merge_words(words_lower, ner_words)
+
+            # Filter merged words to keep only those in ner_words
+            filtered_words = [word for word in merged_words if word in ner_words]
+            
             if with_freq:
-                word_freq = Counter(words_lower)
-                filtered_ners = [word.lower() for word, label in ner_list if label == target_label]
-                filtered_words = {word: word_freq[word] for word in filtered_ners if word in word_freq}
-                return filtered_words
+                word_freq = Counter(filtered_words)
+                return dict(word_freq)
             else:
-                filtered_ners = [word.lower() for word, label in ner_list if label == target_label]
-                filtered_words = [word for word in words if word.lower() in filtered_ners]
                 return ' '.join(filtered_words)
 
 
@@ -159,7 +158,6 @@ class DocSelector:
         self,
         df: pd.DataFrame,
         target_label: str,
-        lemmas_col: str = 'raw_text_LEMMAS',
         ner_col: str = 'raw_text_SPEC_NERS',
         min_count: int = 1
     ) -> pd.DataFrame:
@@ -172,8 +170,6 @@ class DocSelector:
             DataFrame with the documents to filter.
         target_label: str
             Target NER label to filter the documents.
-        lemmas_col: str
-            Column name with the lemmas of the documents.
         ner_col: str
             Column name with the NERs of the documents.
         min_count: int
@@ -185,12 +181,12 @@ class DocSelector:
             DataFrame with the documents that contain at least min_count NERs of the target label.
         """
 
-        if lemmas_col not in df.columns or ner_col not in df.columns:
+        if ner_col not in df.columns:
             self._logger.error(
-                f"Columns {lemmas_col} and {ner_col} must be in the DataFrame. Exiting..."
+                f"Column {ner_col} must be in the DataFrame. Exiting..."
             )
             return df
-
+        
         def count_ners(ners: Any, target_label: str) -> int:
             return sum(1 for _, label in ners if label == target_label)
 

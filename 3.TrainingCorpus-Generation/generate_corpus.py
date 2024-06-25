@@ -52,7 +52,7 @@ def main(config: Dict[str, Any], logger: logging.Logger, df: pd.DataFrame) -> pd
             col_preproc = config['doc_selector']['target_label'] + "_NER_IN_ROW"
         elif doc_selector_mode == 2:  # filter docs if ner
             df = dc.filter_docs_if_ner(
-                df, **{k: v for k, v in config['doc_selector'].items() if k != 'remove_empty'}
+                df, **{k: v for k, v in config['doc_selector'].items() if k not in ['remove_empty','lemmas_col']}
             )
             col_preproc = config['doc_selector']['lemmas_col']
         elif doc_selector_mode == 3:  # just use lemmas
@@ -139,8 +139,11 @@ if __name__ == '__main__':
     logger.info(f"Data loaded from {args.source}")
     logger.info(f"Data shape: {df.shape}")
     logger.info(f"Data columns: {df.columns}")
-
+        
     df = main(config, logger, df)
+    
+    import pdb; pdb.set_trace()
+    
         
     try:
         df.to_parquet(args.output)
