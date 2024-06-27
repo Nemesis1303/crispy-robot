@@ -102,6 +102,7 @@ class NERSpecificExtractor(object):
                 self._logger.info(
                     f"-- -- The maximum context length is {max_context_length} tokens.")
             else:
+                max_context_length = 16385 
                 self._logger.error(
                     "-- -- Maximum context length not found in the error message. Another error occurred.")
             

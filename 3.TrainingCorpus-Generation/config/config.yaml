@@ -1,16 +1,16 @@
-doc_selector_mode: 0   # 0,1,2,3
-preproc: False # True (only if 1,2,3), False (if 0,1,2,3)
+doc_selector_mode: 2   # 0,1,2,3
+preproc: True # True (only if 1,2,3), False (if 0,1,2,3)
 
 doc_selector:
   lemmas_col: raw_text_LEMMAS
   ner_col: raw_text_SPEC_NERS
-  target_label: PRODUCT
+  target_label: CS
   remove_empty: True
-  min_count: 10
+  min_count: 5
 
 preprocessor:
   exec:
-    mode: manual # manual or auto
+    mode: auto # manual or auto
     path_stw: wdlists/stw
     path_eq : wdlists/eqs
   object_creation:

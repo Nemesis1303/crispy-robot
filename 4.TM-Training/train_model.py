@@ -85,6 +85,7 @@ def main(
         }.items() if value is not None
     }
 
+
     trainer = create_model(model_type, **model_params)
     training_time = trainer.train(source, **train_args)
 
@@ -99,7 +100,7 @@ if __name__ == '__main__':
     parser.add_argument('--ntopics', type=int,
                         help='Number of topics to train the model with.')
     parser.add_argument('--model_type', type=str,
-                        help='Type of model to train.', default='MalletLda')
+                        help='Type of model to train.', choices=['BERTopic','MalletLda'],default='MalletLda')
     parser.add_argument(
         '-s', '--source', help='Input parquet file', required=True)
     parser.add_argument(

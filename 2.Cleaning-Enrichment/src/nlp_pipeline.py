@@ -330,7 +330,7 @@ class NLPpipeline(object):
                 text = text
             # 3. Lemmatize text
             try:
-                doc = nlp(text)
+                doc = nlp(text[:1000000])
             except Exception as e:
                 self._logger.error(
                     f"-- -- Error ocurred while applying Spacy pipe: {e}")

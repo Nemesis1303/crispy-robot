@@ -6,6 +6,7 @@ import json
 import logging
 import pathlib
 import time
+import glob
 from typing import Dict, List, Union
 
 import pandas as pd
@@ -71,6 +72,11 @@ class Preprocessor:
             List of stopwords.
         """
         stop_words = []
+        
+        #change sblanco
+        stw_files = list(pathlib.Path(stw_files).glob('*.json'))
+        #import ipdb ; ipdb.set_trace()
+
         for stw_file in stw_files:
             with pathlib.Path(stw_file).open('r', encoding='utf8') as fin:
                 stop_words += json.load(fin)['wordlist']
@@ -91,6 +97,11 @@ class Preprocessor:
             Dictionary of term_to_replace -> new_term.
         """
         equivalents = {}
+        
+        eq_files = list(pathlib.Path(eq_files).glob('*.json'))
+
+        #import ipdb ; ipdb.set_trace()
+
         for eq_file in eq_files:
             with pathlib.Path(eq_file).open('r', encoding='utf8') as fin:
                 new_eq = json.load(fin)['wordlist']

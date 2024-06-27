@@ -1,0 +1,12 @@
+bertopic
+gensim
+hdbscan
+matplotlib
+numpy
+pandas
+PyYAML
+scikit_learn
+scipy==1.12
+sentence_transformers
+sparse_dot_topn
+
