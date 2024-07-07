@@ -81,7 +81,7 @@ def main(
     train_args = {
         key: value for key, value in {
             "text_col": config["text_col"],
-            "raw_text_col": config.get("raw_text_col") if model_type == "BERTopic" else None
+            "raw_text_data": config.get("raw_text_col") if model_type == "BERTopic" else None
         }.items() if value is not None
     }
 

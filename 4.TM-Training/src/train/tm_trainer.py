@@ -136,7 +136,7 @@ class TMTrainer(ABC):
         """
         
         
-        self._save_thr_fig(thetas, self.model_path.joinpath('thetasDist.pdf'))
+        # self._save_thr_fig(thetas, self.model_path.joinpath('thetasDist.pdf'))
         thetas = sparse.csr_matrix(thetas, copy=True)
 
         alphas = np.asarray(np.mean(thetas, axis=0)).ravel()
@@ -604,7 +604,7 @@ class BERTopicTrainer(TMTrainer):
         no_below: int = 1,
         no_above: float = 1.0,
         stopwords: List[str] = None,
-        sbert_model: str = "multi-qa-mpnet-base-dot-v1",
+        sbert_model: str = "paraphrase-distilroberta-base-v2",
         umap_n_components: int = 5,
         umap_n_neighbors: int = 15,
         umap_min_dist: float = 0.0,
