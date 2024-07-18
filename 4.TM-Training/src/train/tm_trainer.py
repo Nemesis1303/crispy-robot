@@ -357,7 +357,6 @@ class MalletLDATrainer(TMTrainer):
         logger : logging.Logger, optional
             Logger object to log activity.
         """
-
         super().__init__(num_topics, topn, model_path, logger)
 
         self.mallet_path = pathlib.Path(mallet_path)
