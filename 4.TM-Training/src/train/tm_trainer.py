@@ -10,7 +10,9 @@ from subprocess import check_output
 import time
 from typing import List
 from abc import ABC, abstractmethod
+import warnings
 
+from dotenv import load_dotenv
 import numpy as np
 import pandas as pd
 import yaml
@@ -26,8 +28,15 @@ from sklearn.feature_extraction.text import CountVectorizer
 from bertopic.representation import KeyBERTInspired, MaximalMarginalRelevance
 from bertopic.vectorizers import ClassTfidfTransformer
 from sparse_dot_topn import awesome_cossim_topn
+from scipy.sparse import lil_matrix, csr_matrix
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", category=DeprecationWarning)
+    import pyLDAvis
+
 
 from src.utils.utils import file_lines, get_embeddings_from_str, pickler
+from src.train.topic_labeller import TopicLabeller
+
 
 class TMTrainer(ABC):
     """
@@ -39,8 +48,6 @@ class TMTrainer(ABC):
         num_topics: int = 20,
         topn: int = 15,
         model_path: str = None,
-        logger: logging.Logger = None,
-
     ) -> None:
         """
         Initialize the TMTrainer class.
@@ -53,31 +60,37 @@ class TMTrainer(ABC):
             Number of top words per topic.
         model_path : str, optional
             Path to save the trained model.
-        logger : logging.Logger, optional
-            Logger object to log activity.
-        path_logs : pathlib.Path, optional
-            Path for saving logs.
+
         """
-        
+
         # Initialize logger
-        if logger is None:
-            self._logger = logging.getLogger(__name__)
-        else:
-            self._logger = logger
+        self._logger = logging.getLogger(__name__)
 
         # Create folder for saving model
-        self.model_path = pathlib.Path(model_path) if model_path else pathlib.Path(__file__).parent / "model"
+        self.model_path = pathlib.Path(
+            model_path) if model_path else pathlib.Path(__file__).parent / "model"
         if self.model_path.exists():
             self._logger.info(
                 f"-- -- Model path {self.model_path} already exists. Saving a copy..."
             )
-            old_model_dir = self.model_path.parent / (self.model_path.name + "_old")
+            old_model_dir = self.model_path.parent / \
+                (self.model_path.name + "_old")
             if not old_model_dir.is_dir():
                 os.makedirs(old_model_dir)
                 shutil.move(self.model_path, old_model_dir)
 
         self.model_path.mkdir(exist_ok=True)
-        
+
+        # Load OpenAI API key
+        try:
+            path_env = pathlib.Path(os.getcwd()).parent / '.env'
+            load_dotenv(path_env)
+            self._api_key = os.getenv("OPENAI_API_KEY")
+        except Exception as e:
+            self._logger.error(
+                f"-- -- Error loading OpenAI API key: {e}. Exiting...")
+            self._logger.info(f"-- -- Topic labels will not be generated.")
+
         # Other attributes
         self.num_topics = num_topics
         self.topn = topn
@@ -86,11 +99,12 @@ class TMTrainer(ABC):
         """
         Save the initialization parameters to a YAML file.
         """
-        params = {k: v for k, v in self.__dict__.items() if not callable(v) and not k.startswith('_')}
+        params = {k: v for k, v in self.__dict__.items(
+        ) if not callable(v) and not k.startswith('_')}
         yaml_path = self.model_path / 'config.yaml'
         with yaml_path.open('w') as yaml_file:
             yaml.dump(params, yaml_file)
-    
+
     def _save_thr_fig(
         self,
         thetas: np.ndarray,
@@ -98,7 +112,7 @@ class TMTrainer(ABC):
     ) -> None:
         """
         Creates a figure to illustrate the effect of thresholding.
-        
+
         Parameters
         ----------
         thetas : np.ndarray
@@ -106,10 +120,11 @@ class TMTrainer(ABC):
         plot_file : pathlib.Path
             The name of the file where the plot will be saved.
         """
-        
+
         all_values = np.sort(thetas.flatten())
         step = int(np.round(len(all_values) / 1000))
-        plt.semilogx(all_values[::step], (100 / len(all_values)) * np.arange(0, len(all_values))[::step])
+        plt.semilogx(all_values[::step], (100 / len(all_values))
+                     * np.arange(0, len(all_values))[::step])
         plt.savefig(plot_file)
         plt.close()
 
@@ -134,16 +149,14 @@ class TMTrainer(ABC):
         keys : List[List[str]]
             The top words for each topic.
         """
-        
-        
+
         # self._save_thr_fig(thetas, self.model_path.joinpath('thetasDist.pdf'))
         thetas = sparse.csr_matrix(thetas, copy=True)
 
         alphas = np.asarray(np.mean(thetas, axis=0)).ravel()
-        
+
         bow = self.get_bow(vocab)
-        bow = sparse.csr_matrix(bow, copy=True)
-        
+
         sims, sim_rpr = self.calculate_sims(thetas)
 
         np.save(self.model_path.joinpath('alphas.npy'), alphas)
@@ -154,15 +167,43 @@ class TMTrainer(ABC):
         with open(self.model_path.joinpath('distances.txt'), 'w') as f:
             for item in sim_rpr:
                 f.write("%s\n" % item)
-        
+
         with self.model_path.joinpath('vocab.txt').open('w', encoding='utf8') as fout:
             fout.write('\n'.join(vocab))
 
         self._logger.info(f"-- -- TOPIC DESCRIPTIONS:")
-        self._logger.info('\n'.join([f"TOPIC {id_tpc}: {' '.join(topic)}" for id_tpc, topic in enumerate(keys)]))
+        self._logger.info('\n'.join(
+            [f"TOPIC {id_tpc}: {' '.join(topic)}" for id_tpc, topic in enumerate(keys)]))
         with self.model_path.joinpath('tpc_descriptions.txt').open('w', encoding='utf8') as fout:
             fout.write('\n'.join([' '.join(topic) for topic in keys]))
 
+        self._logger.info(f"-- -- Generating PyLDAvis visualization...")
+        vis_data = self.generate_pyldavis(thetas, betas, vocab, alphas)
+        # Save html
+        with self.model_path.joinpath("pyLDAvis.html").open("w") as f:
+            pyLDAvis.save_html(vis_data, f)
+
+        # Get coordinates of topics in the pyLDAvis visualization
+        vis_data_dict = vis_data.to_dict()
+        self._coords = list(
+            zip(*[vis_data_dict['mdsDat']['x'], vis_data_dict['mdsDat']['y']]))
+
+        with self.model_path.joinpath('tpc_coords.txt').open('w', encoding='utf8') as fout:
+            for item in self._coords:
+                fout.write(str(item) + "\n")
+                
+        # Get topic labels
+        if self._api_key:
+            self._logger.info(f"-- -- Generating topic labels...")
+            tpc_labels = self.get_tpc_labels(keys)
+        else:
+            self._logger.info(f"-- -- OpenAI API key not found. Generating topics labels as 'Topic n'...")
+            tpc_labels = [(i, f"Topic {i}") for i in range(self.num_topics)]
+            
+        with self.model_path.joinpath('tpc_labels.txt').open('w', encoding='utf8') as fout:
+            for item in tpc_labels:
+                fout.write(str(item) + "\n")
+                
     def get_bow(self, vocab: List[str]) -> np.ndarray:
         """
         Get the Bag of Words (BoW) matrix of the documents, maintaining the internal order of the words as in the betas matrix.
@@ -177,9 +218,10 @@ class TMTrainer(ABC):
         np.ndarray
             The Bag of Words matrix.
         """
-        
+
         if self.train_data is None:
-            self._logger.error(f"-- -- Train data not loaded. Cannot create BoW matrix.")
+            self._logger.error(
+                f"-- -- Train data not loaded. Cannot create BoW matrix.")
             return np.array([])
 
         vocab_w2id = {wd: id_wd for id_wd, wd in enumerate(vocab)}
@@ -188,28 +230,40 @@ class TMTrainer(ABC):
         bow = [gensim_dict.doc2bow(doc) for doc in self.train_data]
 
         gensim_to_tmt_ids = {
-            word_tuple[0]: (vocab_w2id[gensim_dict[word_tuple[0]]] if gensim_dict[word_tuple[0]] in vocab_w2id else None)
+            word_tuple[0]: (vocab_w2id[gensim_dict[word_tuple[0]]]
+                            if gensim_dict[word_tuple[0]] in vocab_w2id else None)
             for doc in bow for word_tuple in doc
         }
-        gensim_to_tmt_ids = {key: value for key, value in gensim_to_tmt_ids.items() if value is not None}
+        gensim_to_tmt_ids = {
+            key: value for key, value in gensim_to_tmt_ids.items() if value is not None}
 
         sorted_bow = [
-            sorted([(gensim_to_tmt_ids[gensim_word_id], weight) for gensim_word_id, weight in doc if gensim_word_id in gensim_to_tmt_ids], key=lambda x: x[0])
+            sorted([(gensim_to_tmt_ids[gensim_word_id], weight) for gensim_word_id,
+                   weight in doc if gensim_word_id in gensim_to_tmt_ids], key=lambda x: x[0])
             for doc in bow
         ]
 
-        bow_mat = np.zeros((len(sorted_bow), len(vocab)), dtype=np.int32)
-        _ = [[np.put(bow_mat[doc_id], word_id, weight) for word_id, weight in doc] for doc_id, doc in enumerate(sorted_bow)]
+        num_docs = len(sorted_bow)
+        num_words = len(vocab)
 
-        self._logger.info(f"-- -- BoW matrix shape: {bow_mat.shape}")
+        # Create a sparse matrix in LIL format
+        bow_mat_sparse = lil_matrix((num_docs, num_words), dtype=np.int32)
 
-        return bow_mat
-    
+        # Populate the sparse matrix
+        for doc_id, doc in enumerate(sorted_bow):
+            for word_id, weight in doc:
+                bow_mat_sparse[doc_id, word_id] = weight
+        bow_mat_sparse = csr_matrix(bow_mat_sparse)
+
+        self._logger.info(f"-- -- BoW matrix constructed")
+
+        return bow_mat_sparse
+
     def calculate_sims(
-        self,
-        thetas: sparse.csr_matrix,
-        topn:int=300,
-        lb:float=0):
+            self,
+            thetas: sparse.csr_matrix,
+            topn: int = 300,
+            lb: float = 0):
         """Given the path to a TMmodel, it calculates the similarities between documents and saves them in a sparse matrix.
 
         Parameters
@@ -226,21 +280,68 @@ class TMTrainer(ABC):
         t_start = time.perf_counter()
         thetas_sqrt = np.sqrt(thetas)
         thetas_col = thetas_sqrt.T
-        
-        self._logger.info(f"-- -- Calculating similarities between documents with topn={topn} and lb={lb}...")
+
+        self._logger.info(
+            f"-- -- Calculating similarities between documents with topn={topn} and lb={lb}...")
         sims = awesome_cossim_topn(thetas_sqrt, thetas_col, topn, lb)
         t_end = time.perf_counter()
         t_total = (t_end - t_start)/60
         self._logger.info(f"-- -- Similarities calculated in: {t_total}")
-        
-        self._logger.info(f"-- -- Getting string representation of similarities...")
-        non_zero_indices = sparse.triu(sims, k=1).nonzero() # non-zero elements indices
+
+        self._logger.info(
+            f"-- -- Getting string representation of similarities...")
+        non_zero_indices = sparse.triu(
+            sims, k=1).nonzero()  # non-zero elements indices
         sim_str = \
             [' '.join([f"{self.ids_corpus[col]}|{sims[row, col]}" for col in non_zero_indices[1]
-                        [non_zero_indices[0] == row]][1:]) for row in range(sims.shape[0])]
-        
+                       [non_zero_indices[0] == row]][1:]) for row in range(sims.shape[0])]
+
         return sims, sim_str
-                
+
+    def get_tpc_labels(self, tpc_descriptions):
+        """returns the labels of the topics in the model
+
+        Returns
+        -------
+        tpc_labels: list of tuples
+            Each element is a a term (topic_id, "label for topic topic_id")                    
+        """
+        
+        # Create a topic labeller object
+        tl = TopicLabeller(openai_api_key=self._api_key)
+
+        # Get labels
+        labels = tl.get_labels(tpc_descriptions)
+        labels_format = [p for _, p in enumerate(labels)]
+
+        return labels_format
+
+    def generate_pyldavis(self, thetas: np.ndarray, betas: np.ndarray, vocab: List[str], alphas: np.ndarray) -> None:
+        # We will compute the visualization using ndocs random documents
+        # In case the model has gone through topic deletion, we may have rows
+        # in the thetas matrix that sum up to zero (active topics have been
+        # removed for these problematic documents). We need to take this into
+        # account
+        ndocs = 10000
+        validDocs = np.sum(thetas.toarray(), axis=1) > 0
+        nValidDocs = np.sum(validDocs)
+        if ndocs > nValidDocs:
+            ndocs = nValidDocs
+        perm = np.sort(np.random.permutation(nValidDocs)[:ndocs])
+        # We consider all documents are equally important
+        doc_len = ndocs * [1]
+        vocabfreq = np.round(ndocs*(alphas.dot(betas))).astype(int)
+        vis_data = pyLDAvis.prepare(
+            betas,
+            thetas[validDocs, ][perm, ].toarray(),
+            doc_len,
+            vocab,
+            vocabfreq,
+            lambda_step=0.05,
+            sort_topics=False,
+            n_jobs=-1)
+
+        return vis_data
 
     def _load_train_data(
         self,
@@ -261,7 +362,7 @@ class TMTrainer(ABC):
         text_data : str, default='tr_tokens'
             Column name containing the text data.
         """
-        
+
         path_to_data = pathlib.Path(path_to_data)
         self.text_col = text_data
 
@@ -275,24 +376,28 @@ class TMTrainer(ABC):
         try:
             self.train_data = [doc.split() for doc in df[text_data]]
         except KeyError:
-            self._logger.error(f"-- -- Column {text_data} not found in the data. Exiting...")
+            self._logger.error(
+                f"-- -- Column {text_data} not found in the data. Exiting...")
             return
         try:
             self.ids_corpus = df.pdf_id.values.tolist()
         except KeyError:
-            self._logger.error(f"-- -- Column pdf_id not found in the data. Exiting...")
+            self._logger.error(
+                f"-- -- Column pdf_id not found in the data. Exiting...")
             return
-        
+
         self._logger.info(f"-- -- Loaded processed data from {path_to_data}")
 
         if get_embeddings:
             if "embeddings" not in df.columns:
-                self._logger.warning(f"-- -- Embeddings not present in data. They will be calculated at training time.")
+                self._logger.warning(
+                    f"-- -- Embeddings not present in data. They will be calculated at training time.")
                 self.embeddings = None
                 self.raw_text = [doc.split() for doc in df[raw_text_data]]
             else:
                 self.embeddings = get_embeddings_from_str(df, self._logger)
-                self._logger.info(f"-- -- Loaded embeddings from the DataFrame")
+                self._logger.info(
+                    f"-- -- Loaded embeddings from the DataFrame")
         else:
             self.embeddings = None
 
@@ -310,6 +415,7 @@ class TMTrainer(ABC):
         """
         pass
 
+
 class MalletLDATrainer(TMTrainer):
     """
     Trainer for Mallet LDA topic model.
@@ -324,10 +430,10 @@ class MalletLDATrainer(TMTrainer):
         num_iters: int = 1000,
         doc_topic_thr: float = 0.0,
         token_regexp: str = "[\p{L}\p{N}][\p{L}\p{N}\p{P}]*\p{L}",
-        mallet_path: str = pathlib.Path(__file__).parent / "Mallet-202108/bin/mallet",
+        mallet_path: str = pathlib.Path(
+            __file__).parent / "Mallet-202108/bin/mallet",
         topn: int = 15,
         model_path: str = None,
-        logger: logging.Logger = None,
     ) -> None:
         """
         Initialization method.
@@ -357,7 +463,7 @@ class MalletLDATrainer(TMTrainer):
         logger : logging.Logger, optional
             Logger object to log activity.
         """
-        super().__init__(num_topics, topn, model_path, logger)
+        super().__init__(num_topics, topn, model_path)
 
         self.mallet_path = pathlib.Path(mallet_path)
         self.alpha = alpha
@@ -368,7 +474,8 @@ class MalletLDATrainer(TMTrainer):
         self.token_regexp = token_regexp
 
         if not self.mallet_path.is_file():
-            self._logger.error(f'-- -- Provided mallet path is not valid -- Stop')
+            self._logger.error(
+                f'-- -- Provided mallet path is not valid -- Stop')
             sys.exit()
 
     def train(self, path_to_data: str, text_col: str = "tr_tokens") -> float:
@@ -388,7 +495,8 @@ class MalletLDATrainer(TMTrainer):
             Time taken to train the model.
         """
 
-        self._load_train_data(path_to_data, get_embeddings=False, text_data=text_col)
+        self._load_train_data(
+            path_to_data, get_embeddings=False, text_data=text_col)
 
         t_start = time.perf_counter()
 
@@ -414,7 +522,8 @@ class MalletLDATrainer(TMTrainer):
             self._logger.info(f'-- -- Running command {cmd}')
             check_output(args=cmd, shell=True)
         except:
-            self._logger.error('-- -- Mallet failed to import data. Revise command')
+            self._logger.error(
+                '-- -- Mallet failed to import data. Revise command')
         self._logger.info(f"-- -- Data imported to Mallet.")
 
         config_mallet = self.mallet_folder / "config.mallet"
@@ -426,27 +535,37 @@ class MalletLDATrainer(TMTrainer):
             fout.write(f'num-threads = {self.num_threads}\n')
             fout.write(f'num-iterations = {self.num_iterations}\n')
             fout.write(f'doc-topics-threshold = {self.doc_topic_thr}\n')
-            fout.write(f'output-state = {self.mallet_folder.joinpath("topic-state.gz").resolve().as_posix()}\n')
-            fout.write(f'output-doc-topics = {self.mallet_folder.joinpath("doc-topics.txt").resolve().as_posix()}\n')
-            fout.write(f'word-topic-counts-file = {self.mallet_folder.joinpath("word-topic-counts.txt").resolve().as_posix()}\n')
-            fout.write(f'diagnostics-file = {self.mallet_folder.joinpath("diagnostics.xml").resolve().as_posix()}\n')
-            fout.write(f'xml-topic-report = {self.mallet_folder.joinpath("topic-report.xml").resolve().as_posix()}\n')
-            fout.write(f'output-topic-keys = {self.mallet_folder.joinpath("topickeys.txt").resolve().as_posix()}\n')
-            fout.write(f'inferencer-filename = {self.mallet_folder.joinpath("inferencer.mallet").resolve().as_posix()}\n')
+            fout.write(
+                f'output-state = {self.mallet_folder.joinpath("topic-state.gz").resolve().as_posix()}\n')
+            fout.write(
+                f'output-doc-topics = {self.mallet_folder.joinpath("doc-topics.txt").resolve().as_posix()}\n')
+            fout.write(
+                f'word-topic-counts-file = {self.mallet_folder.joinpath("word-topic-counts.txt").resolve().as_posix()}\n')
+            fout.write(
+                f'diagnostics-file = {self.mallet_folder.joinpath("diagnostics.xml").resolve().as_posix()}\n')
+            fout.write(
+                f'xml-topic-report = {self.mallet_folder.joinpath("topic-report.xml").resolve().as_posix()}\n')
+            fout.write(
+                f'output-topic-keys = {self.mallet_folder.joinpath("topickeys.txt").resolve().as_posix()}\n')
+            fout.write(
+                f'inferencer-filename = {self.mallet_folder.joinpath("inferencer.mallet").resolve().as_posix()}\n')
 
         cmd = f'{self.mallet_path} train-topics --config {config_mallet}'
 
         try:
-            self._logger.info(f'-- -- Training mallet topic model. Command is {cmd}')
+            self._logger.info(
+                f'-- -- Training mallet topic model. Command is {cmd}')
             check_output(args=cmd, shell=True)
         except:
             self._logger.error('-- -- Model training failed. Revise command')
             return
 
-        self._logger.info(f"-- -- Loading thetas from {self.mallet_folder.joinpath('doc-topics.txt')}")
+        self._logger.info(
+            f"-- -- Loading thetas from {self.mallet_folder.joinpath('doc-topics.txt')}")
         thetas_file = self.mallet_folder.joinpath('doc-topics.txt')
         cols = [k for k in np.arange(2, self.num_topics + 2)]
-        thetas = np.loadtxt(thetas_file, delimiter='\t', dtype=np.float32, usecols=cols)
+        thetas = np.loadtxt(thetas_file, delimiter='\t',
+                            dtype=np.float32, usecols=cols)
 
         wtcFile = self.mallet_folder.joinpath('word-topic-counts.txt')
         vocab_size = file_lines(wtcFile)
@@ -466,17 +585,18 @@ class MalletLDATrainer(TMTrainer):
 
         keys = []
         for k in range(self.num_topics):
-            keys.append([vocab[w] for w in np.argsort(betas[k])[::-1][:self.topn]])
+            keys.append([vocab[w]
+                        for w in np.argsort(betas[k])[::-1][:self.topn]])
 
         t_end = time.perf_counter() - t_start
-        
+
         self._save_model_results(thetas, betas, vocab, keys)
         self._save_init_params_to_yaml()
 
         self._extract_pipe()
 
         return t_end
-    
+
     def _extract_pipe(self) -> None:
         """
         Create a pipe based on a small amount of the training data to ensure that the holdout data that may be later inferred is compatible with the training data.
@@ -484,7 +604,8 @@ class MalletLDATrainer(TMTrainer):
 
         path_corpus = self.mallet_folder / "corpus.mallet"
         if not path_corpus.is_file():
-            self._logger.error(f"-- Pipe extraction: Could not locate corpus file")
+            self._logger.error(
+                f"-- Pipe extraction: Could not locate corpus file")
             return
 
         path_txt = self.mallet_folder / "corpus.txt"
@@ -563,7 +684,8 @@ class MalletLDATrainer(TMTrainer):
             self._logger.info(f'-- Running command {cmd}')
             check_output(args=cmd, shell=True)
         except:
-            self._logger.error('-- Mallet failed to import data. Revise command')
+            self._logger.error(
+                '-- Mallet failed to import data. Revise command')
             return
 
         self._logger.info('-- Inference: Inferring Topic Proportions')
@@ -584,11 +706,13 @@ class MalletLDATrainer(TMTrainer):
         self._logger.info(f"-- -- Inference completed. Loading thetas...")
 
         cols = [k for k in np.arange(2, self.num_topics + 2)]
-        thetas32 = np.loadtxt(doc_topics_file, delimiter='\t', dtype=np.float32, usecols=cols)
+        thetas32 = np.loadtxt(doc_topics_file, delimiter='\t',
+                              dtype=np.float32, usecols=cols)
 
         self._logger.info(f"-- -- Inferred thetas shape {thetas32.shape}")
 
         return thetas32
+
 
 class BERTopicTrainer(TMTrainer):
     """
@@ -649,11 +773,9 @@ class BERTopicTrainer(TMTrainer):
             Method to select the number of clusters.
         hbdsan_prediction_data : bool, default=True
             If True, the prediction data is used for HDBSCAN.
-        logger : logging.Logger, optional
-            Logger object to log activity.
         """
 
-        super().__init__(num_topics, topn, model_path, logger)
+        super().__init__(num_topics, topn, model_path)
 
         self.sbert_model = sbert_model
         self.no_below = no_below
@@ -695,17 +817,21 @@ class BERTopicTrainer(TMTrainer):
             Time taken to train the model.
         """
 
-        self._load_train_data(path_to_data, get_embeddings=True, text_data=text_col, raw_text_data=raw_text_data)
-        
+        self._load_train_data(path_to_data, get_embeddings=True,
+                              text_data=text_col, raw_text_data=raw_text_data)
+
         t_start = time.perf_counter()
 
-        self._logger.info(f'-- -- BERTopic Corpus Generation: Using text from col {text_col}')
+        self._logger.info(
+            f'-- -- BERTopic Corpus Generation: Using text from col {text_col}')
 
         if self.embeddings is not None:
-            self._logger.info("-- -- Using pre-trained embeddings from the dataset...")
+            self._logger.info(
+                "-- -- Using pre-trained embeddings from the dataset...")
         else:
-            self._logger.info(f"-- -- Creating SentenceTransformer model with {self.sbert_model}...")
-        
+            self._logger.info(
+                f"-- -- Creating SentenceTransformer model with {self.sbert_model}...")
+
         self._embedding_model = SentenceTransformer(self.sbert_model)
 
         self._umap_model = UMAP(
@@ -745,10 +871,10 @@ class BERTopicTrainer(TMTrainer):
             embedding_model=self._embedding_model,
             verbose=True
         )
-        
-        self._logger.info(f"-- -- Training BERTopic model with {self.num_topics} topics... ")
 
-        
+        self._logger.info(
+            f"-- -- Training BERTopic model with {self.num_topics} topics... ")
+
         if self.embeddings is not None:
             texts = [" ".join(doc) for doc in self.train_data]
             _, probs = self._model.fit_transform(texts, self.embeddings)
@@ -756,28 +882,29 @@ class BERTopicTrainer(TMTrainer):
             texts = [" ".join(doc) for doc in self.raw_text]
             _, probs = self._model.fit_transform(texts)
 
-        thetas_approx, _ = self._model.approximate_distribution(texts, use_embedding_model=True)
+        thetas_approx, _ = self._model.approximate_distribution(
+            texts, use_embedding_model=True)
         self._logger.info(f"-- -- Thetas shape: {thetas_approx.shape}")
 
         betas = self._model.c_tf_idf_.toarray()
-        betas = betas[1:, :] #drout outlier topic and keep (K-1, V) matrix
+        betas = betas[1:, :]  # drout outlier topic and keep (K-1, V) matrix
         self._logger.info(f"-- -- Betas shape: {betas.shape}")
         vocab = self._model.vectorizer_model.get_feature_names_out()
 
         keys = []
         for k, v in self._model.get_topics().items():
             keys.append([el[0] for el in v])
-            
+
         model_file = self.model_path.joinpath('model.pickle')
         pickler(model_file, self._model)
 
         t_end = time.perf_counter() - t_start
-        
+
         self._save_model_results(thetas_approx, betas, vocab, keys)
         self._save_init_params_to_yaml()
 
         return t_end
-    
+
     def infer(self, docs: List[str]) -> np.ndarray:
         """
         Perform inference on unseen documents.

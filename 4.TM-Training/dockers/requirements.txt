@@ -9,4 +9,7 @@ scikit_learn
 scipy==1.12
 sentence_transformers
 sparse_dot_topn
+python-dotenv
+openai
+pyLDAvis==3.4.1
 
