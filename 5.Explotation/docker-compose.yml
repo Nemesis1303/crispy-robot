@@ -1,0 +1,95 @@
+version: "3.8"
+
+networks:
+  into-net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.17.24.0/18 # TODO: Update the subnet
+
+services:
+  into-solr-api:
+    build: ./into-solr-api
+    container_name: into-solr-api
+    ports:
+      - 92:82
+    environment:
+      SOLR_URL: http://solr:8983
+      #INFERENCE_URL: http://into-inferencer:90
+    depends_on:
+      - solr
+      #- inferencer
+    networks:
+      - into-net
+    volumes:
+      - ./data/source:/data/source
+      #- ./data/inference:/data/inference
+      - ./into-config:/config
+
+  solr-initializer:
+    image: alpine
+    container_name: into-solr-initializer
+    restart: "no"
+    entrypoint: |
+      /bin/sh -c "chown 8983:8983 /solr"
+    volumes:
+      - ./db/data/solr:/solr
+
+  solr:
+    image: solr:9.1.1
+    container_name: into-solr
+    restart: always
+    volumes:
+      - ./db/data/solr:/var/solr
+      - ./solr-plugins/solr-ewb-jensen-shanon-distance-plugin/solr-js-plugin/target/solr-js-plugin-1.0.0.jar:/opt/solr/dist/plugins/solr-js-plugin-1.0.0.jar
+      #- ./solr-plugins/solr-ewb-sims/solr-sims-plugin/target/solr-sims-plugin-1.0.0.jar:/opt/solr/dist/plugins/solr-sims-plugin-1.0.0.jar
+      - ./solr-config:/opt/solr/server/solr
+    ports:
+      - 8984:8983
+    entrypoint:
+      - docker-entrypoint.sh
+      - solr
+      - start
+      - -f
+      - -c
+      - -z
+      - zoo:2181
+      - -a
+      - "-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=1044 -Djute.maxbuffer=0x5000000"
+    networks:
+      - into-net
+
+  zoo:
+    image: zookeeper
+    container_name: into-zoo
+    restart: always
+    ports:
+      - 3180:8080
+      - 3181:2181
+    environment:
+      - JVMFLAGS=-Djute.maxbuffer=50000000
+    volumes:
+      - ./db/data/zoo/data:/data
+      - ./db/data/zoo/logs:/datalog
+    networks:
+      - into-net
+
+  solr-config:
+    build: ./solr-config
+    container_name: into-solr-config
+    ports:
+      - 81:81
+    depends_on:
+      - solr
+      - zoo
+    networks:
+      - into-net
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./solr-config/bash_scripts:/bash_scripts
+      - ./db/data/solr:/db/data/solr
+    command:
+      - sh
+      - -c
+      - "chmod +x /bash_scripts/init_config.sh && ls /bash_scripts && bash_scripts/init_config.sh /db/data/solr/data"
