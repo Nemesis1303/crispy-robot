@@ -9,13 +9,15 @@ Modifed: 24/01/2024 (Updated for NP-Solr-Service (NextProcurement Proyect))
 import configparser
 import json
 from typing import List
+
+import pandas as pd
 from gensim.corpora import Dictionary
 import pathlib
 import dask.dataframe as dd
 from dask.diagnostics import ProgressBar
 from src.core.entities.utils import (convert_datetime_to_strftime,
                                      parseTimeINSTANT)
-
+from datetime import datetime
 
 class Corpus(object):
     """
@@ -62,19 +64,12 @@ class Corpus(object):
         else:
             self._logger.error(
                 f"Logical corpus configuration {self.name} not found in config file.")
-        self.id_field = cf.get(section, "id_field")
-        self.title_field = cf.get(section, "title_field")
-        self.date_field = cf.get(section, "date_field")
         self.MetadataDisplayed = cf.get(
             section, "MetadataDisplayed").split(",")
         self.SearcheableField = cf.get(section, "SearcheableField").split(",")
-        if self.title_field in self.SearcheableField:
-            self.SearcheableField.remove(self.title_field)
-            self.SearcheableField.append("title")
-        if self.date_field in self.SearcheableField:
-            self.SearcheableField.remove(self.date_field)
-            self.SearcheableField.append("date")
-
+        self.EmbeddingsToIndex = cf.get(
+            section, "EmbeddingsToIndex", None).split(",")
+        
         return
 
     def get_docs_raw_info(self) -> List[dict]:
@@ -86,23 +81,48 @@ class Corpus(object):
             A list of dictionaries containing information about the corpus.
         """
 
-        ddf = dd.read_parquet(self.path_to_raw).fillna("")
+        ddf = pd.read_parquet(self.path_to_raw).fillna("")
         self._logger.info(ddf.head())
+        
+        # TODO: Exploit dataset metadata as independent columns
+        df_meta = ddf["metadata"].apply(pd.Series)
+        df_meta["pdf_id"] = ddf["pdf_id"]
+        ddf = ddf.merge(df_meta, how="inner", on="pdf_id")
 
         # If the id_field is in the SearcheableField, remove it and add the id field (new name for the id_field)
-        if self.id_field in self.SearcheableField:
-            self.SearcheableField.remove(self.id_field)
+        if "pdf_id" in self.SearcheableField:
+            self.SearcheableField.remove("pdf_id")
             self.SearcheableField.append("id")
         self._logger.info(f"SearcheableField {self.SearcheableField}")
+        
+        for el in ["modDdate","creationDate"]:
+            if el in self.SearcheableField:
+                self.SearcheableField.remove(el)
+                self.SearcheableField.append("date")
+        
+        # Check that date is valid
+        def convert_date(date):
+            date_format = "%Y%m%d%H%M%S%z"
+            
+            try:
+                date_ = date.replace("D:", "")
+                if date_.endswith("'"):
+                    date_ = date.split("'")[0]
+                date_str_corrected = date_.replace("'", ":")
+                date_time_obj = datetime.strptime(date_str_corrected, date_format)
+                date_time_np = pd.to_datetime(date_time_obj)
+                
+                return date_time_np
+            except:
+                return pd.to_datetime('now')
+            
+        ddf["date"].apply(convert_date)
 
-        # Rename id-field to id, title-field to title and date-field to date
+        # Rename id-field to id and date-field to date
         ddf = ddf.rename(
             columns={
-                self.id_field: "id",
-                self.title_field: "title",
+                "pdf_id": "id",
                 self.date_field: "date"})
-        with ProgressBar():
-            df = ddf.compute(scheduler='processes')
 
         self._logger.info(df.columns)
 
@@ -113,8 +133,12 @@ class Corpus(object):
         # Get BoW representation
         # We dont read from the gensim dictionary that will be associated with the tm models trained on the corpus since we want to have the bow for all the documents, not only those kept after filering extremes in the dictionary during the construction of the logical corpus
         # check none values: df[df.isna()]
-        df['lemmas_'] = df['lemmas'].apply(
-            lambda x: x.split() if isinstance(x, str) else [])
+        if "lemmas" in df.columns:
+            df['lemmas_'] = df['lemmas'].apply(
+                lambda x: x.split() if isinstance(x, str) else [])
+        else:
+            df['lemmas_'] = df['summary'].apply(
+                lambda x: x if isinstance(x, list) else [])
         dictionary = Dictionary()
         df['bow'] = df['lemmas_'].apply(
             lambda x: dictionary.doc2bow(x, allow_update=True) if x else [])
@@ -133,8 +157,10 @@ class Corpus(object):
                 [f"e{idx}|{val}" for idx, val in enumerate(vector.split())]).rstrip()
 
             return repr
-
-        df["embeddings"] = df["embeddings"].apply(get_str_embeddings)
+        
+        if self.EmbeddingsToIndex:
+            for col in self.EmbeddingsToIndex:
+                df[col] = df[col].apply(get_str_embeddings)
 
         # Convert dates information to the format required by Solr ( ISO_INSTANT, The ISO instant formatter that formats or parses an instant in UTC, such as '2011-12-03T10:15:30Z')
         df, cols = convert_datetime_to_strftime(df)

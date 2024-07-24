@@ -2,18 +2,15 @@ version: "3.8"
 
 networks:
   into-net:
-    driver: bridge
-    ipam:
-      driver: default
-      config:
-        - subnet: 192.17.24.0/18 # TODO: Update the subnet
+    name: ml4ds3_net
+    external: true
 
 services:
   into-solr-api:
     build: ./into-solr-api
     container_name: into-solr-api
     ports:
-      - 92:82
+      - 10000:82
     environment:
       SOLR_URL: http://solr:8983
       #INFERENCE_URL: http://into-inferencer:90
@@ -37,16 +34,15 @@ services:
       - ./db/data/solr:/solr
 
   solr:
-    image: solr:9.1.1
+    image: solr:9.6.1
     container_name: into-solr
     restart: always
     volumes:
       - ./db/data/solr:/var/solr
       - ./solr-plugins/solr-ewb-jensen-shanon-distance-plugin/solr-js-plugin/target/solr-js-plugin-1.0.0.jar:/opt/solr/dist/plugins/solr-js-plugin-1.0.0.jar
-      #- ./solr-plugins/solr-ewb-sims/solr-sims-plugin/target/solr-sims-plugin-1.0.0.jar:/opt/solr/dist/plugins/solr-sims-plugin-1.0.0.jar
       - ./solr-config:/opt/solr/server/solr
     ports:
-      - 8984:8983
+      - 10001:8983
     entrypoint:
       - docker-entrypoint.sh
       - solr
@@ -65,8 +61,8 @@ services:
     container_name: into-zoo
     restart: always
     ports:
-      - 3180:8080
-      - 3181:2181
+      - 10002:8080
+      - 10003:2181
     environment:
       - JVMFLAGS=-Djute.maxbuffer=50000000
     volumes:
@@ -79,7 +75,7 @@ services:
     build: ./solr-config
     container_name: into-solr-config
     ports:
-      - 81:81
+      - 10004:81
     depends_on:
       - solr
       - zoo

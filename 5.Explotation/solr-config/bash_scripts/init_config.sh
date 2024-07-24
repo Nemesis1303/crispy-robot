@@ -10,12 +10,12 @@ then
 	else
     echo "$DIR is Empty"
     echo "---> Inititalizing Solr Config..."
-    docker exec into-solr bin/solr zk upconfig -zkhost zoo:2181 -n into_config -d /opt/solr-9.1.1/server/solr/configsets/into_config
+    docker exec into-solr bin/solr zk upconfig -zkhost zoo:2181 -n into_config -d /opt/solr/server/solr/configsets/into_config
 	fi
 else
 	echo "Directory $DIR not found."
     echo "---> Inititalizing Solr Config..."
-    docker exec into-solr bin/solr zk upconfig -zkhost zoo:2181 -n into_config -d /opt/solr-9.1.1/server/solr/configsets/into_config
+    docker exec into-solr bin/solr zk upconfig -zkhost zoo:2181 -n into_config -d /opt/solr/server/solr/configsets/into_config
 fi
 
 

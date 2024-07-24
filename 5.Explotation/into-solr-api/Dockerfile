@@ -1,7 +1,7 @@
 
 FROM python:3.9
 
-WORKDIR /np-solr-api
+WORKDIR /into-solr-api
 
 COPY . .
 

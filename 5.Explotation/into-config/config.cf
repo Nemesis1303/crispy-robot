@@ -27,10 +27,8 @@ thetas_thr=3e-3
 cache_dir=/data/classifer/models
 
 # There will be one of this for each corpus avaialable
-[cordis-config]
-id_field=id
-title_field=title
-date_field=startDate
-EWBdisplayed=title,objective,euroSciVocCode,date
-SearcheableField=title
+[modulo1-config]
+MetadataDisplayed=summary,date
+SearcheableField=summary
+EmbeddingsToIndex=raw_text_EMBEDDINGS,summary_EMBEDDINGS
 
