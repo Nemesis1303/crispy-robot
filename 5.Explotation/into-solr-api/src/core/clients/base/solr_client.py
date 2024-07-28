@@ -367,6 +367,8 @@ class SolrClient(object):
 
         # Carry on with creation if collection does not exists
         headers_ = {"Content-Type": "application/json"}
+
+        """
         data = {
             "create": {
                 "name": col_name,
@@ -375,6 +377,14 @@ class SolrClient(object):
                 "replicationFactor": replicationFactor
             }
         }
+        """
+        data = {
+            "name": col_name,
+            "config": config,
+            "numShards": nshards,
+            "replicationFactor": replicationFactor
+        }
+
         url_ = '{}/api/collections?'.format(self.solr_url)
 
         # Send request to Solr

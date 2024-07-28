@@ -67,8 +67,7 @@ class Corpus(object):
         self.MetadataDisplayed = cf.get(
             section, "MetadataDisplayed").split(",")
         self.SearcheableField = cf.get(section, "SearcheableField").split(",")
-        self.EmbeddingsToIndex = cf.get(
-            section, "EmbeddingsToIndex", None).split(",")
+        self.EmbeddingsToIndex = cf.get(section, "EmbeddingsToIndex", fallback="").split(",")
         
         return
 
@@ -84,25 +83,39 @@ class Corpus(object):
         ddf = pd.read_parquet(self.path_to_raw).fillna("")
         self._logger.info(ddf.head())
         
-        # TODO: Exploit dataset metadata as independent columns
+        # Exploit dataset metadata as independent columns
         df_meta = ddf["metadata"].apply(pd.Series)
         df_meta["pdf_id"] = ddf["pdf_id"]
-        ddf = ddf.merge(df_meta, how="inner", on="pdf_id")
-
+        df = ddf.merge(df_meta, how="inner", on="pdf_id")
+        df = df.drop('metadata', axis=1)
+        
+        self._logger.info(
+            f"-- -- Metadata extracted OK. Columns: {ddf.columns}")
+        try:
+            df = df.drop('page', axis=1)
+        except Exception as e:
+            self._logger.info(f"-- -- Page column not found in the metadata: {e}")
+            
         # If the id_field is in the SearcheableField, remove it and add the id field (new name for the id_field)
         if "pdf_id" in self.SearcheableField:
             self.SearcheableField.remove("pdf_id")
             self.SearcheableField.append("id")
         self._logger.info(f"SearcheableField {self.SearcheableField}")
         
-        for el in ["modDdate","creationDate"]:
-            if el in self.SearcheableField:
-                self.SearcheableField.remove(el)
-                self.SearcheableField.append("date")
+        date_field = None
+        if not "date" in self.SearcheableField:
+            for el in ["modDdate","creationDate"]:
+                if el in self.SearcheableField:
+                    self._logger.info(f"Date field {el} found in SearcheableField. Replacing it by date.")
+                    date_field = el
+                    self.SearcheableField.remove(el)
+                    self.SearcheableField.append("date")
+        if date_field is None:
+            date_field = "creationDate"
         
         # Check that date is valid
         def convert_date(date):
-            date_format = "%Y%m%d%H%M%S%z"
+            date_format = "%Y-%m-%d %H:%M:%S"
             
             try:
                 date_ = date.replace("D:", "")
@@ -114,21 +127,30 @@ class Corpus(object):
                 
                 return date_time_np
             except:
-                return pd.to_datetime('now')
+                return pd.to_datetime('now') # TODO: There should be a better way of handeling this
             
-        ddf["date"].apply(convert_date)
+        df["creationDate"] = df["creationDate"].apply(convert_date)
+        self._logger.info("-- -- Dates from creationDate converted OK.")
+        df["modDate"] = df["modDate"].apply(convert_date)
+        self._logger.info("-- -- Dates from modDdate converted OK.")
+        df["date"] = df[date_field]#.combine_first(df["modDdate"])
+        self._logger.info(f"-- -- Dates from date created OK based on {date_field}.")
 
         # Rename id-field to id and date-field to date
-        ddf = ddf.rename(
-            columns={
-                "pdf_id": "id",
-                self.date_field: "date"})
+        df = df.rename(columns={"pdf_id": "id"})
+        
+        # Rename tr_tokens to lemmas
+        if "tr_tokens" in df.columns:
+            df = df.rename(columns={"tr_tokens": "lemmas"})
 
         self._logger.info(df.columns)
 
         # Get number of words per document based on the lemmas column
         # NOTE: Document whose lemmas are empty will have a length of 0
-        df["nwords_per_doc"] = df["lemmas"].apply(lambda x: len(x.split()))
+        if "lemmas" in df.columns:
+            df["nwords_per_doc"] = df["lemmas"].apply(lambda x: len(x.split()))
+        else:
+            df["nwords_per_doc"] = df["raw_text"].apply(lambda x: len(x))
 
         # Get BoW representation
         # We dont read from the gensim dictionary that will be associated with the tm models trained on the corpus since we want to have the bow for all the documents, not only those kept after filering extremes in the dictionary during the construction of the logical corpus
@@ -160,7 +182,8 @@ class Corpus(object):
         
         if self.EmbeddingsToIndex:
             for col in self.EmbeddingsToIndex:
-                df[col] = df[col].apply(get_str_embeddings)
+                if col in df.columns:
+                    df[col] = df[col].apply(get_str_embeddings)
 
         # Convert dates information to the format required by Solr ( ISO_INSTANT, The ISO instant formatter that formats or parses an instant in UTC, such as '2011-12-03T10:15:30Z')
         df, cols = convert_datetime_to_strftime(df)
@@ -179,7 +202,12 @@ class Corpus(object):
 
         json_str = df.to_json(orient='records')
         json_lst = json.loads(json_str)
+        # save json to file
+        with open(self.path_to_raw.parent / f"{self.name}.json", 'w') as f:
+            json.dump(json_lst, f)
 
+        self._logger.info(f"-- -- JSON created OK. Metadata: {df.columns}")
+        
         return json_lst
 
     def get_corpora_update(

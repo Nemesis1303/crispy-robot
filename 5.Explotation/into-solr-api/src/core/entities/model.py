@@ -1,13 +1,8 @@
 """
-This module is a class implementation to manage and hold all the information associated with a TMmodel. It provides methods to retrieve information about the model such as topic distribution over documents, topic-word probabilities, and betas. 
-
-Note:
------
-This module assumes that the topic model has been trained using the TMmodel class from the same package.
+This module is a class implementation to manage and hold all the information associated with a model trained with the module 4.TM-Training. It provides methods to retrieve information about the model such as topic distribution over documents, topic-word probabilities, and betas. 
 
 Author: Lorena Calvo-Bartolomé
-Date: 27/03/2023
-Modifed: 24/01/2024 (Updated for NP-Solr-Service (NextProcurement Proyect))
+Date: 28/03/2024
 """
 
 
@@ -17,19 +12,20 @@ import os
 import pathlib
 from typing import List
 
+from scipy import sparse
+import yaml
+
 import dask.dataframe as dd
 import numpy as np
 import pandas as pd
 from dask.diagnostics import ProgressBar
-from src.core.entities.tm_model import TMmodel
-# from tm_model import TMmodel
-from src.core.entities.utils import sum_up_to
+from src.core.entities.utils import calculate_beta_ds, process_line, sum_up_to
 # from utils import sum_up_to
 
 
 class Model(object):
     """
-    A class to manage and hold all the information associated with a TMmodel so it can be indexed in Solr.
+    A class to manage and hold all the information associated with a topic model so it can be indexed in Solr.
     """
 
     def __init__(self,
@@ -41,7 +37,7 @@ class Model(object):
         Parameters
         ----------
         path_to_model: pathlib.Path
-            Path to the TMmodel folder.
+            Path to the model folder.
         logger : logging.Logger
             The logger object to log messages and errors.
         config_file: str
@@ -67,18 +63,45 @@ class Model(object):
         # Read configuration from config file
         cf = configparser.ConfigParser()
         cf.read(config_file)
-        if self.name.startswith('prodlda') or self.name.startswith('ctm'):
-            self.thetas_max_sum = int(
-                cf.get('restapi', 'max_sum_neural_models'))
-        else:
-            self.thetas_max_sum = int(cf.get('restapi', 'thetas_max_sum'))
+        self.thetas_max_sum = int(cf.get('restapi', 'thetas_max_sum'))
         self.betas_max_sum = int(cf.get('restapi', 'betas_max_sum'))
-        # self.thetas_max_sum = 1000
-        # self.betas_max_sum = 10000
 
-        # Get model information from TMmodel
-        self.tmmodel = TMmodel(self.path_to_model.joinpath("TMmodel"))
-        self.alphas, self.betas, self.thetas, self.vocab, self.sims, self.coords = self.tmmodel.get_model_info_for_vis()
+        # Get model information
+        self.alphas = np.load(self.path_to_model.joinpath("alphas.npy"))
+        self.betas = np.load(self.path_to_model.joinpath("betas.npy"))
+        self.betas_ds = calculate_beta_ds(self.betas)
+        self.thetas = sparse.load_npz(self.path_to_model.joinpath("thetas.npz"))
+        self.ndocs_active = np.array((self.thetas != 0).sum(0).tolist()[0])
+        with self.path_to_model.joinpath('vocab.txt').open('r', encoding='utf8') as fin:
+            self.vocab = [el.strip() for el in fin.readlines()]
+        self.vocab_w2id = {}
+        self.vocab_id2w = {}
+        with self.path_to_model.joinpath('vocab.txt').open('r', encoding='utf8') as fin:
+            for i, line in enumerate(fin):
+                wd = line.strip()
+                self.vocab_w2id[wd] = i
+                self.vocab_id2w[str(i)] = wd
+        self.sims = sparse.load_npz(self.path_to_model.joinpath('distances.npz'))
+        with self.path_to_model.joinpath('tpc_coords.txt').open('r', encoding='utf8') as fin:
+            # read the data from the file and convert it back to a list of tuples
+            self.coords = [tuple(map(float, line.strip()[1:-1].split(', '))) for line in fin]
+        with self.path_to_model.joinpath('tpc_descriptions.txt').open('r', encoding='utf8') as fin:
+                self.tpc_descriptions = [el.strip() for el in fin.readlines()]
+        with self.path_to_model.joinpath('tpc_labels.txt').open('r', encoding='utf8') as fin:
+                self.tpc_labels = [el.strip() for el in fin.readlines()]
+        data = {
+            "betas": [self.betas],
+            "betas_ds": [self.betas_ds],
+            "alphas": [self.alphas],
+            #"topic_entropy": [self._topic_entropy],
+            #"topic_coherence": [self._topic_coherence],
+            "ndocs_active": [self.ndocs_active],
+            "tpc_descriptions": [self.tpc_descriptions],
+            "tpc_labels": [self.tpc_labels],
+        }
+        self.df = pd.DataFrame(data)
+        
+        self._logger.info(self.df)
 
         return
 
@@ -91,13 +114,8 @@ class Model(object):
             A list of dictionaries containing information about the topic model.
         """
 
-        # Read training config ('trainconfig.json')
-        tr_config = self.path_to_model.joinpath("trainconfig.json")
-        with pathlib.Path(tr_config).open('r', encoding='utf8') as fin:
-            tr_config = json.load(fin)
-
         # Get model information as dataframe, where each row is a topic
-        df, vocab_id2w, vocab = self.tmmodel.to_dataframe()
+        df, vocab_id2w, vocab = self.df, self.vocab_id2w, self.vocab
         df = df.apply(pd.Series.explode)
         df.reset_index(drop=True)
         df["id"] = [f"t{i}" for i in range(len(df))]
@@ -170,20 +188,17 @@ class Model(object):
         action: str
             Action to be performed ('set', 'remove')
 
-        Returns:
+        Returns:[]
         --------
         json_lst: list[dict]
             A list of dictionaries with thr document-topic proportions update.
         """
-
-        # Read training configuration
-        tr_config = self.path_to_model.joinpath("trainconfig.json")
-        with pathlib.Path(tr_config).open('r', encoding='utf8') as fin:
-            tr_config = json.load(fin)
-
         # Get corpus path and name of the collection
-        self.corpus = tr_config["TrDtSet"]
-        self.corpus_name = pathlib.Path(tr_config["TrDtSet"]).name
+        path_model_config = self.path_to_model.joinpath("config.yaml")
+        with open(path_model_config, 'r') as file:
+            model_config = yaml.safe_load(file)
+        self.corpus = model_config.get('path_to_data')
+        self.corpus_name = pathlib.Path(self.corpus).name
         if self.corpus_name.endswith(".parquet") or self.corpus_name.endswith(".json"):
             self.corpus_name = self.corpus_name.split(".")[0].lower()
 
@@ -192,22 +207,14 @@ class Model(object):
         sim_model_key = 'sim_' + self.name
 
         # Get ids of documents kept in the tr corpus
-        if tr_config["trainer"].lower() == "mallet":
-            def process_line(line):
-                id_ = line.rsplit(' 0 ')[0].strip()
-                id_ = int(id_.strip('"'))
-                return id_
-            with open(self.path_to_model.joinpath("corpus.txt"), encoding="utf-8") as file:
+
+        try:
+            with open(self.path_to_model.joinpath("modelFiles/corpus.txt"), encoding="utf-8") as file:
                 ids_corpus = [process_line(line) for line in file]
-        elif tr_config["trainer"].lower() == "prodlda" or \
-                tr_config["trainer"].lower() == "ctm":
-            ddf = dd.read_parquet(
-                self.path_to_model.joinpath("corpus.parquet"))
-            with ProgressBar():
-                ids_corpus = ddf["id"].compute(scheduler='processes')
-        else:
-            self._logger.error(
-                '-- -- The trainer used to train the model is not supported.')
+        except FileNotFoundError:
+            self._logger.info(
+                '-- -- Corpus file not found.')
+        
 
         # Actual topic model's information only needs to be retrieved if action is "set"
         if action == "set":
@@ -243,7 +250,7 @@ class Model(object):
             # Get similarities string representation
             self._logger.info("Attaining sims rpr...")
 
-            with open(self.path_to_model.joinpath("TMmodel").joinpath('distances.txt'), 'r') as f:
+            with open(self.path_to_model.joinpath('distances.txt'), 'r') as f:
                 sim_rpr = [line.strip() for line in f]
             self._logger.info(
                 "Thetas and sims attained. Creating dataframe...")

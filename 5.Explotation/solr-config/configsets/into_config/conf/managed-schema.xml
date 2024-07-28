@@ -122,13 +122,26 @@
   <field name="summary" type="text_general" indexed="true" stored="true" multiValued="false" />
   <field name="lemmas" type="text_general" indexed="true" stored="true" multiValued="false" />
   <field name="date" type="pdate" indexed="true" stored="true" multiValued="false" />
+  <field name="modDate" type="pdate" indexed="true" stored="true" multiValued="false" />
+  <field name="creationDate" type="pdate" indexed="true" stored="true" multiValued="false" />
   <field name="nwords_per_doc" type="pint" indexed="true" stored="true" multiValued="false" />
   <field name="SearcheableField" type="text_general" indexed="true" stored="true" multiValued="false" />
   <field name="raw_text_EMBEDDINGS" type="VectorFloatField" indexed="true" termOffsets="true" stored="true"
   termPositions="true" termVectors="true" multiValued="false" />
   <field name="summary_EMBEDDINGS" type="VectorFloatField" indexed="true" termOffsets="true" stored="true"
   termPositions="true" termVectors="true" multiValued="false" />
-
+  <field name="pdf_path" type="text_general" indexed="true" stored="true" multiValued="false" />
+  <field name="file_path" type="text_general" indexed="true" stored="true" multiValued="false" />
+  <field name="json_path" type="text_general" indexed="true" stored="true" multiValued="false" />
+  <field name="author" type="text_general" indexed="true" stored="true" multiValued="false" />
+  <field name="creator" type="text_general" indexed="true" stored="true" multiValued="false" />
+  <field name="producer" type="text_general" indexed="true" stored="true" multiValued="false" />
+  <field name="source" type="text_general" indexed="true" stored="true" multiValued="false" />
+  <field name="format" type="text_general" indexed="true" stored="true" multiValued="false" />
+  <field name="subject" type="text_general" indexed="true" stored="true" multiValued="false" />
+  <field name="title" type="text_general" indexed="true" stored="true" multiValued="false" />
+  <field name="total_pages" type="pint" indexed="true" stored="true" multiValued="false" />
+  
   <!-- Model fields  -->
   <field name="alphas" type="pfloat" indexed="true" stored="true" multiValued="false" />
   <field name="topic_entropy" type="pfloat" indexed="true" stored="true" multiValued="false" />
@@ -141,7 +154,13 @@
   <field name="usersIsRelevant" type="string" indexed="true" stored="true" multiValued="true" />
 
   <!-- docValues are enabled by default for long type so we don't need to index the version field  -->
-  <field name="_version_" type="plong" indexed="false" stored="false" />
+  <field name="_version_" type="plong" indexed="false" stored="false"/>
+
+  <!-- If you don't use child/nested documents, then you should remove the next two fields:  -->
+  <!-- for nested documents (minimal; points to root document) -->
+  <field name="_root_" type="string" indexed="true" stored="false" docValues="false" />
+  <!-- for nested documents (relationship tracking) -->
+  <field name="_nest_path_" type="_nest_path_" /><fieldType name="_nest_path_" class="solr.NestPathField" />
 
   <field name="_text_" type="text_general" indexed="true" stored="false" multiValued="true" />
 

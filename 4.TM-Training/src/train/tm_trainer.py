@@ -99,8 +99,11 @@ class TMTrainer(ABC):
         """
         Save the initialization parameters to a YAML file.
         """
+        
+        not_include = ['train_data', 'df', 'embeddings', 'ids_corpus', '_logger', '_embedding_model', '_umap_model', '_hdbscan_model', '_vectorizer_model', '_ctfidf_model', '_representation_model', '_model']
+        
         params = {k: v for k, v in self.__dict__.items(
-        ) if not callable(v) and not k.startswith('_')}
+        ) if not callable(v) and not k.startswith('_') and not k in not_include and not isinstance(v, (np.ndarray, pd.DataFrame, pd.Series, list, dict, pathlib.Path))}
         yaml_path = self.model_path / 'config.yaml'
         with yaml_path.open('w') as yaml_file:
             yaml.dump(params, yaml_file)
@@ -363,6 +366,7 @@ class TMTrainer(ABC):
             Column name containing the text data.
         """
 
+        self.path_to_data = path_to_data
         path_to_data = pathlib.Path(path_to_data)
         self.text_col = text_data
 

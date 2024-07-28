@@ -65,7 +65,8 @@ def parseTimeINSTANT(time):
     else:
         if math.isnan(time):
             return clean_xml_string("")
-        
+
+
 def sum_up_to(
     vector: np.ndarray,
     max_sum: int
@@ -91,3 +92,26 @@ def sum_up_to(
         if x[idx] > 0:
             x[idx] += 1
     return x
+
+
+def process_line(line):
+    id_ = line.rsplit(' 0 ')[0].strip()
+    id_ = int(id_.strip('"'))
+    return id_
+
+
+def calculate_beta_ds(betas):
+    """Calculates beta with down-scoring
+    Emphasizes words appearing less frequently in topics
+    """
+
+    ntopics = betas.shape[0]
+    size_vocab = betas.shape[1]
+    betas_ds = np.copy(betas)
+    if np.min(betas_ds) < 1e-12:
+        betas_ds += 1e-12
+    deno = np.reshape((sum(np.log(betas_ds)) /
+                       ntopics), (size_vocab, 1))
+    deno = np.ones((ntopics, 1)).dot(deno.T)
+    betas_ds = betas_ds * (np.log(betas_ds) - deno)
+    return betas_ds

@@ -460,9 +460,9 @@ class IntoSolrClient(SolrClient):
         """
 
         # 1. Get stem of the model folder
-        model_to_index = pathlib.Path(model_path)
-        model_name = pathlib.Path(model_to_index).stem.lower()
-
+        model_to_index = self.path_source / model_path
+        model_name = model_to_index.stem.lower()
+    
         # 2. Create collection
         _, err = self.create_collection(
             col_name=model_name, config=self.solr_config)
