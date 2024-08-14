@@ -2,7 +2,7 @@ version: "3.8"
 
 networks:
   into-net:
-    name: ml4ds3_net
+    name: ml4ds_net
     external: true
 
 services:
@@ -89,3 +89,14 @@ services:
       - sh
       - -c
       - "chmod +x /bash_scripts/init_config.sh && ls /bash_scripts && bash_scripts/init_config.sh /db/data/solr/data"
+
+  into-tools:
+    build: ./into-tools
+    container_name: into-tools
+    ports:
+      - 10005:102
+    networks:
+      - into-net
+    volumes:
+      - ./data/source:/data/source
+      - ./into-config:/config
