@@ -16,7 +16,7 @@ import pandas as pd
 from sklearn.preprocessing import normalize
 
 sys.path.append('../')
-from module4.src.train.tm_trainer import MalletLDATrainer, BERTopicTrainer
+from src.core.module4.src.train.tm_trainer import MalletLDATrainer, BERTopicTrainer
 
 def sum_up_to(vector: np.ndarray, max_sum: int) -> np.ndarray:
     """It takes in a vector and a max_sum value and returns a NumPy array with the same shape as vector but with the values adjusted such that their sum is equal to max_sum.

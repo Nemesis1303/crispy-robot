@@ -3,7 +3,7 @@ This module is a class implementation to manage and hold all the information ass
 
 Author: Lorena Calvo-Bartolomé
 Date: 27/03/2023
-Modifed: 24/01/2024 (Updated for NP-Solr-Service (NextProcurement Proyect))
+Modifed: 15/07/2024 (Updated for Into-Solr-Service (IntoKnow Proyect))
 """
 
 import configparser
@@ -174,16 +174,27 @@ class Corpus(object):
         self._logger.info("-- -- BoW calculated OK.")
 
         # Ger embeddings of the documents
+        """
         def get_str_embeddings(vector):
             repr = " ".join(
                 [f"e{idx}|{val}" for idx, val in enumerate(vector.split())]).rstrip()
 
             return repr
+        """
         
+        def get_float_embeddings(vector):
+            return [float(val) for _, val in enumerate(vector.split())]
+        
+        lastCol = ""
         if self.EmbeddingsToIndex:
             for col in self.EmbeddingsToIndex:
                 if col in df.columns:
-                    df[col] = df[col].apply(get_str_embeddings)
+                    lastCol = col
+                    df[col] = df[col].apply(get_float_embeddings)
+        
+        if col != "":
+            self._logger.info(f"-- -- Embeddings calculated OK for {lastCol}.")
+        self._logger.info(f"-- -- The embeddings for {lastCol} look like this: {df.iloc[0][lastCol]}")
 
         # Convert dates information to the format required by Solr ( ISO_INSTANT, The ISO instant formatter that formats or parses an instant in UTC, such as '2011-12-03T10:15:30Z')
         df, cols = convert_datetime_to_strftime(df)

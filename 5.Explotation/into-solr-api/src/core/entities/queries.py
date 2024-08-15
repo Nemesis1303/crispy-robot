@@ -164,6 +164,16 @@ class Queries(object):
 
         # If adding a new one, start numberation at 20
         
+        # # Q21: getDocsSimilarToFreeTextEmb
+        # # Retrieve documents that are semantically similar to a given free text using BERT embeddings. The free text is represented by its BERT embeddings, and these embeddings for the documents in the collection are precalculated and indexed into Solr for efficient retrieval.
+        # ################################################################
+        self.Q21 = {
+            'q': "{{!knn f=raw_text_EMBEDDINGS topK=10}}{}",
+            'fl': "id,title,score",
+            'start': '{}',
+            'rows': '{}'
+        }
+        
         
     def customize_Q1(self,
                      id: str,
@@ -477,3 +487,36 @@ class Queries(object):
         }
 
         return custom_q18
+    
+    def customize_Q21(
+        self,
+        doc_embeddings: str,
+        start: str,
+        rows: str
+    ) -> dict:
+        """Customizes query Q21 'getDocsSimilarToFreeTextEmb'
+
+        Parameters
+        ----------
+        doc_embeddings: str
+            Embeddings of the user's free doc.
+        distance: str
+            Distance metric to be used.
+        start: str
+            Start value.
+        rows: str
+            Number of rows to retrieve.
+
+        Returns
+        -------
+        custom_q5: dict
+            Customized query Q5.
+        """
+
+        custom_q21 = {
+            'query': self.Q21['q'].format(doc_embeddings),
+            'fl': self.Q21['fl'],
+            'start': self.Q21['start'].format(start),
+            'rows': self.Q21['rows'].format(rows),
+        }
+        return custom_q21

@@ -53,8 +53,8 @@ RUN mkdir -p /data/source
 
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install "dask[complete]"
-RUN python -m spacy download es_dep_news_trf
-RUN python -m spacy download en_core_web_trf
+#RUN python -m spacy download es_dep_news_trf
+#RUN python -m spacy download en_core_web_trf
 
 # Clone the Mallet repository and build it
 RUN mkdir -p /app && \

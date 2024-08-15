@@ -29,8 +29,8 @@ class Lemmatizer(object):
         cf.read(config_file)
 
         # By default uses these but they could be configured in the config file (they need to be also downloaded from spacy. The latter is done in the Dockerfile)
-        self._nlp_es = spacy.load("es_dep_news_trf")
-        self._nlp_en = spacy.load("en_core_web_trf")
+        #self._nlp_es = spacy.load("es_dep_news_trf")
+        #self._nlp_en = spacy.load("en_core_web_trf")
 
     def lemmatize(
         self,

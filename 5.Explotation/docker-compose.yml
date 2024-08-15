@@ -2,8 +2,8 @@ version: "3.8"
 
 networks:
   into-net:
-    name: ml4ds_net
-    external: true
+    #name: ml4ds_net
+    #external: true
 
 services:
   into-solr-api:

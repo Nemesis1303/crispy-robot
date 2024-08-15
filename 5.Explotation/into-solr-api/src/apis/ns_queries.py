@@ -109,6 +109,16 @@ q14_parser.add_argument(
     'rows', help='Controls how many rows of responses are displayed at a time (default value: maximum number of docs in the collection)', required=False)
 """
 
+q21_parser = reqparse.RequestParser()
+q21_parser.add_argument(
+    'corpus_collection', help='Name of the corpus collection', required=True)
+q21_parser.add_argument(
+    'free_text', help="Document (free text) to search for documents that are similar to it.", required=True)
+q21_parser.add_argument(
+    'start', help='Specifies an offset (by default, 0) into the responses at which Solr should begin displaying content', required=False)
+q21_parser.add_argument(
+    'rows', help='Controls how many rows of responses are displayed at a time (default value: maximum number of docs in the collection)', required=False)
+
 
 @api.route('/getThetasDocById/')
 class getThetasDocById(Resource):
@@ -284,3 +294,23 @@ class getDocsSimilarToFreeText(Resource):
         except Exception as e:
             return str(e), 500
 """
+
+@api.route('/getDocsSimilarToFreeTextEmb/')
+class getDocsSimilarToFreeTextEmb(Resource):
+    @api.doc(parser=q21_parser)
+    def get(self):
+        args = q21_parser.parse_args()
+        corpus_collection = args['corpus_collection']
+        doc = args['free_text']
+        start = args['start']
+        rows = args['rows']
+        try:
+            return sc.do_Q21(
+                corpus_col=corpus_collection,
+                search_doc=doc,
+                embedding_model="bert",
+                start=start,
+                rows=rows
+            )
+        except Exception as e:
+            return str(e), 500

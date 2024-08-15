@@ -126,10 +126,10 @@
   <field name="creationDate" type="pdate" indexed="true" stored="true" multiValued="false" />
   <field name="nwords_per_doc" type="pint" indexed="true" stored="true" multiValued="false" />
   <field name="SearcheableField" type="text_general" indexed="true" stored="true" multiValued="false" />
-  <field name="raw_text_EMBEDDINGS" type="VectorFloatField" indexed="true" termOffsets="true" stored="true"
-  termPositions="true" termVectors="true" multiValued="false" />
-  <field name="summary_EMBEDDINGS" type="VectorFloatField" indexed="true" termOffsets="true" stored="true"
-  termPositions="true" termVectors="true" multiValued="false" />
+
+  <field name="raw_text_EMBEDDINGS" type="knn_vector" indexed="true" stored="true" multiValued="false"/>
+  <field name="summary_EMBEDDINGS" type="knn_vector" indexed="true" stored="true" multiValued="false"/>
+
   <field name="pdf_path" type="text_general" indexed="true" stored="true" multiValued="false" />
   <field name="file_path" type="text_general" indexed="true" stored="true" multiValued="false" />
   <field name="json_path" type="text_general" indexed="true" stored="true" multiValued="false" />
@@ -379,6 +379,8 @@
       <filter class="solr.DelimitedPayloadTokenFilterFactory" encoder="float" />
     </analyzer>
   </fieldType>
+
+  <fieldType name="knn_vector" class="solr.DenseVectorField" vectorDimension="768" similarityFunction="cosine"/>
 
   <field name="betas" type="VectorField" indexed="true" termOffsets="true" stored="true"
     termPositions="true" termVectors="true" multiValued="false" />

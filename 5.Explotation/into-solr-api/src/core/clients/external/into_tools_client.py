@@ -1,10 +1,10 @@
 """
-This  module provides 2 classes to handle NP Tools API responses and requests.
+This  module provides 2 classes to handle Into Tools API responses and requests.
 
-The NPToolsResponse class handles NP Tools API response and errors, while the NPToolsClient class handles requests to the NP Tools API.
+The IntoToolsResponse class handles Into Tools API response and errors, while the IntoToolsClient class handles requests to the Into Tools API.
 
 Author: Lorena Calvo-Bartolomé
-Date: 21/05/2023
+Date: 15/08/2023
 """
 
 import logging
@@ -16,9 +16,9 @@ from src.core.clients.external.api_generic.client import Client
 from src.core.clients.external.api_generic.response import Response
 
 
-class NPToolsResponse(Response):
+class IntoToolsResponse(Response):
     """
-    A class to handle Inferencer API response and errors.
+    A class to handle Into Tools API response and errors.
     """
 
     def __init__(
@@ -31,9 +31,9 @@ class NPToolsResponse(Response):
         return
 
 
-class NPToolsClient(Client):
+class IntoToolsClient(Client):
     """
-    A class to handle NP Tools API requests.
+    A class to handle Into Tools API requests.
     """
 
     def __init__(
@@ -50,10 +50,10 @@ class NPToolsClient(Client):
             The timeout of the request in seconds, by default 120.
         """
 
-        super().__init__(logger, "NP Tools Client")
+        super().__init__(logger, "Into Tools Client")
 
         # Get the NP Tools URL from the environment variables
-        self.nptools_url = os.environ.get('NP_TOOLS_URL')
+        self.intotools_url = os.environ.get('INTO_TOOLS_URL')
         self.timeout = timeout
 
         return
@@ -64,8 +64,8 @@ class NPToolsClient(Client):
         url: str,
         timeout: int = 120,
         **params
-    ) -> NPToolsResponse:
-        """Sends a request to the Inferencer API and returns an object of the NPToolsResponse class.
+    ) -> IntoToolsResponse:
+        """Sends a request to the Into Tools API and returns an object of the IntoToolsResponse class.
 
         Parameters
         ----------
@@ -80,15 +80,15 @@ class NPToolsClient(Client):
 
         Returns
         -------
-        NPToolsResponse: NPToolsResponse
-            An object of the NPToolsResponse class.
+        IntoToolsResponse: IntoToolsResponse
+            An object of the IntoToolsResponse class.
         """
 
         # Send request
         resp = super()._do_request(type, url, timeout, **params)
 
         # Parse NP Tools response
-        inf_resp = NPToolsResponse(resp, self.logger)
+        inf_resp = IntoToolsResponse(resp, self.logger)
 
         return inf_resp
 
@@ -98,7 +98,7 @@ class NPToolsClient(Client):
         embedding_model: str,
         lang: str,
         model_for_embedding: str = None
-    ) -> NPToolsResponse:
+    ) -> IntoToolsResponse:
         """Get the embedding of a word using the given model.
 
         Parameters
@@ -114,8 +114,8 @@ class NPToolsClient(Client):
 
         Returns
         -------
-        NPToolsResponse: NPToolsResponse
-            An object of the NPToolsResponse class.
+        IntoToolsResponse: IntoToolsResponse
+            An object of the IntoToolsResponse class.
         """
 
         headers_ = {'Accept': 'application/json'}
@@ -137,7 +137,7 @@ class NPToolsClient(Client):
         encoded_params = urlencode(params_)
 
         url_ = '{}/embedder/getEmbedding/?{}'.format(
-            self.nptools_url, encoded_params)
+            self.intotools_url, encoded_params)
 
         self.logger.info(f"-- -- get_embedding - URL: {url_}")
 
@@ -153,7 +153,7 @@ class NPToolsClient(Client):
         self,
         text_to_lemmatize: str,
         lang: str,
-    ) -> NPToolsResponse:
+    ) -> IntoToolsResponse:
         """Get the lemmas of a text.
 
         Parameters
@@ -166,8 +166,8 @@ class NPToolsClient(Client):
 
         Returns
         -------
-        NPToolsResponse: NPToolsResponse
-            An object of the NPToolsResponse class.
+        IntoToolsResponse: IntoToolsResponse
+            An object of the IntoToolsResponse class.
         """
 
         headers_ = {'Accept': 'application/json'}
@@ -180,7 +180,7 @@ class NPToolsClient(Client):
         encoded_params = urlencode(params_)
 
         url_ = '{}/lemmatizer/getLemmas/?{}'.format(
-            self.nptools_url, encoded_params)
+            self.intotools_url, encoded_params)
 
         self.logger.info(f"-- -- get_lemmas - URL: {url_}")
 
@@ -196,7 +196,7 @@ class NPToolsClient(Client):
         self,
         text_to_infer: str,
         model_for_infer: str,
-    ) -> NPToolsResponse:
+    ) -> IntoToolsResponse:
         """Get the thetas representation for a document based on a given trained topic model. 
         The format of the response from the NP Tools API is as follows:
 
@@ -222,8 +222,8 @@ class NPToolsClient(Client):
 
         Returns
         -------
-        NPToolsResponse: NPToolsResponse
-            An object of the NPToolsResponse class.
+        IntoToolsResponse: IntoToolsResponse
+            An object of the IntoToolsResponse class.
         """
 
         headers_ = {'Accept': 'application/json'}
@@ -236,7 +236,7 @@ class NPToolsClient(Client):
         encoded_params = urlencode(params_)
 
         url_ = '{}/inferencer/inferDoc/?{}'.format(
-            self.nptools_url, encoded_params)
+            self.intotools_url, encoded_params)
 
         self.logger.info(f"-- -- get_thetas - URL: {url_}")
 
