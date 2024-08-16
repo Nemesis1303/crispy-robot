@@ -353,6 +353,7 @@ class TMTrainer(ABC):
         self,
         path_to_data: str,
         get_embeddings: bool = False,
+        id_col: str = "pdf_id",
         text_data: str = "tr_tokens",
         raw_text_data: str = "raw_text"
     ) -> None:
@@ -365,13 +366,18 @@ class TMTrainer(ABC):
             Path to the training data.
         get_embeddings : bool, default=False
             Whether to load embeddings from the data.
+        id_col : str, default='pdf_id'
+            Column name containing the document IDs.
         text_data : str, default='tr_tokens'
             Column name containing the text data.
+        raw_text_data : str, default='raw_text'
+            Column name containing the raw text data.
         """
 
         self.path_to_data = path_to_data
         path_to_data = pathlib.Path(path_to_data)
         self.text_col = text_data
+        self.id_col = id_col
 
         try:
             df = pd.read_parquet(path_to_data)
@@ -518,8 +524,9 @@ class MalletLDATrainer(TMTrainer):
 
         self._logger.info(f"-- -- Creating Mallet corpus.txt...")
         corpus_txt_path = self.mallet_folder / "corpus.txt"
+
         with corpus_txt_path.open("w", encoding="utf8") as fout:
-            for i, t in enumerate(self.df[self.text_col]):
+            for i, t in zip(self.df[self.id_col], self.df[self.text_col]):
                 fout.write(f"{i} 0 {t}\n")
         self._logger.info(f"-- -- Mallet corpus.txt created.")
 
@@ -839,6 +846,17 @@ class BERTopicTrainer(TMTrainer):
 
         self._load_train_data(path_to_data, get_embeddings=True,
                               text_data=text_col, raw_text_data=raw_text_data)
+        
+        self.mallet_folder = self.model_path / "modelFiles"
+        self.mallet_folder.mkdir(exist_ok=True)
+
+        self._logger.info(f"-- -- Creating Mallet corpus.txt...")
+        corpus_txt_path = self.mallet_folder / "corpus.txt"
+        
+        with corpus_txt_path.open("w", encoding="utf8") as fout:
+            for i, t in zip(self.df[self.id_col], self.df[self.text_col]):
+                fout.write(f"{i} 0 {t}\n")
+        self._logger.info(f"-- -- Mallet corpus.txt created.")
 
         t_start = time.perf_counter()
 

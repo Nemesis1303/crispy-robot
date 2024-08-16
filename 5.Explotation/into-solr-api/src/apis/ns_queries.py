@@ -270,8 +270,8 @@ class getModelInfo(Resource):
 
 
 
-@api.route('/getDocsSimilarToFreeText/')
-class getDocsSimilarToFreeText(Resource):
+@api.route('/getDocsSimilarToFreeTextTM/')
+class getDocsSimilarToFreeTextTM(Resource):
     @api.doc(parser=q14_parser)
     def get(self):
         args = q14_parser.parse_args()

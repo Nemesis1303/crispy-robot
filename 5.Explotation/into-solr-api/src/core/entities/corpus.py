@@ -116,7 +116,6 @@ class Corpus(object):
         # Check that date is valid
         def convert_date(date):
             date_format = "%Y-%m-%d %H:%M:%S"
-            
             try:
                 date_ = date.replace("D:", "")
                 if date_.endswith("'"):
@@ -200,7 +199,7 @@ class Corpus(object):
         # Convert NERS to payload format if any
         for col in df.columns:
             if col in ["raw_text_GEN_NERS", "raw_text_SPEC_NERS", "summary_GEN_NERS", "summary_SPEC_NERS"]:
-                df[col] = df[col].apply(lambda x: " ".join([f"{el[0]}|{el[1]}" for el in x]))
+                df[col] = df[col].apply(lambda x: " ".join([f"{'_'.join(el[0].split())}|{el[1]}" for el in x]))
 
         # Save corpus fields
         self.fields = df.columns.tolist()
@@ -222,7 +221,6 @@ class Corpus(object):
         """Creates the json to update the 'corpora' collection in Solr with the new logical corpus information.
         """
 
-        # TODO: Update
         fields_dict = [{"id": id,
                         "corpus_name": self.name,
                         "corpus_path": self.path_to_raw.as_posix(),
@@ -251,35 +249,21 @@ class Corpus(object):
         action: str
     ):
 
-        ddf = dd.read_parquet(self.path_to_raw).fillna("")
-
-        # Rename id-field to id, title-field to title and date-field to date
-        ddf = ddf.rename(
-            columns={self.id_field: "id",
-                     self.title_field: "title",
-                     self.date_field: "date"})
-
-        with ProgressBar():
-            df = ddf.compute(scheduler='processes')
-
+        ddf = pd.read_parquet(self.path_to_raw).fillna("")
+        self._logger.info(ddf.head())
+        
+        # Exploit dataset metadata as independent columns
+        df_meta = ddf["metadata"].apply(pd.Series)
+        df_meta["pdf_id"] = ddf["pdf_id"]
+        df = ddf.merge(df_meta, how="inner", on="pdf_id")
+        df = df.drop('metadata', axis=1)
+            
         if action == "add":
             new_SearcheableFields = [
                 el for el in new_SearcheableFields if el not in self.SearcheableField]
-            if self.title_field in new_SearcheableFields:
-                new_SearcheableFields.remove(self.title_field)
-                new_SearcheableFields.append("title")
-            if self.date_field in new_SearcheableFields:
-                new_SearcheableFields.remove(self.date_field)
-                new_SearcheableFields.append("date")
             new_SearcheableFields = list(
                 set(new_SearcheableFields + self.SearcheableField))
         elif action == "remove":
-            if self.title_field in new_SearcheableFields:
-                new_SearcheableFields.remove(self.title_field)
-                new_SearcheableFields.append("title")
-            if self.date_field in new_SearcheableFields:
-                new_SearcheableFields.remove(self.date_field)
-                new_SearcheableFields.append("date")
             new_SearcheableFields = [
                 el for el in self.SearcheableField if el not in new_SearcheableFields]
 
