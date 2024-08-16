@@ -410,14 +410,14 @@ class SolrClient(object):
             A list of dictionaries with the name of the deleted collection.
         """
 
-        url_ = '{}/api/collections?action=DELETE&name={}'.format(
+        url_ = '{}/solr/admin/collections?action=DELETE&name={}'.format(
             self.solr_url, col_name)
 
         # Send request to Solr
         solr_resp = self._do_request(type="get", url=url_)
 
         return [{'name': col_name}], solr_resp.status_code
-
+    
     def delete_doc_by_id(self, col_name: str, id: int) -> int:
         """
         Deletes the document with the given id in the Solr collection with the given name. 

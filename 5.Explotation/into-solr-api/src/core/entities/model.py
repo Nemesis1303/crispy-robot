@@ -53,7 +53,7 @@ class Model(object):
 
         if not os.path.isdir(path_to_model):
             self._logger.error(
-                '-- -- The provided model path does not exist.')
+                f'-- -- The provided model path {path_to_model} does not exist.')
         self.path_to_model = path_to_model
 
         # Get model and corpus names
