@@ -13,7 +13,7 @@ services:
       - 10000:82
     environment:
       SOLR_URL: http://solr:8983
-      #INFERENCE_URL: http://into-inferencer:90
+      INTO_TOOLS_URL: http://into-tools:102
     depends_on:
       - solr
       #- inferencer

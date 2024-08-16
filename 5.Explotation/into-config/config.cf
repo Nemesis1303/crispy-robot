@@ -23,8 +23,9 @@ path_source=/data/source
 [inferencer]
 thetas_thr=3e-3
 
-[classifier]
-cache_dir=/data/classifer/models
+[lemmatizer]
+nlp_es=es_core_news_md
+nlp_en=en_core_web_md
 
 # There will be one of this for each corpus avaialable
 [modulo1-config]

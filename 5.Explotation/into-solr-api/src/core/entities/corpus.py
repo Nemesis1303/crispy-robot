@@ -127,7 +127,7 @@ class Corpus(object):
                 
                 return date_time_np
             except:
-                return pd.to_datetime('now') # TODO: There should be a better way of handeling this
+                return pd.to_datetime('now') 
             
         df["creationDate"] = df["creationDate"].apply(convert_date)
         self._logger.info("-- -- Dates from creationDate converted OK.")
@@ -173,24 +173,13 @@ class Corpus(object):
 
         self._logger.info("-- -- BoW calculated OK.")
 
-        # Ger embeddings of the documents
-        """
-        def get_str_embeddings(vector):
-            repr = " ".join(
-                [f"e{idx}|{val}" for idx, val in enumerate(vector.split())]).rstrip()
-
-            return repr
-        """
-        
-        def get_float_embeddings(vector):
-            return [float(val) for _, val in enumerate(vector.split())]
-        
+        # Get embeddings of the documents        
         lastCol = ""
         if self.EmbeddingsToIndex:
             for col in self.EmbeddingsToIndex:
                 if col in df.columns:
                     lastCol = col
-                    df[col] = df[col].apply(get_float_embeddings)
+                    df[col] = df[col].apply(lambda x: [float(val) for _, val in enumerate(x.split())])
         
         if col != "":
             self._logger.info(f"-- -- Embeddings calculated OK for {lastCol}.")
@@ -207,6 +196,11 @@ class Corpus(object):
             lambda x: ' '.join(x.astype(str)), axis=1)
 
         self._logger.info("-- -- SearcheableField created OK.")
+        
+        # Convert NERS to payload format if any
+        for col in df.columns:
+            if col in ["raw_text_GEN_NERS", "raw_text_SPEC_NERS", "summary_GEN_NERS", "summary_SPEC_NERS"]:
+                df[col] = df[col].apply(lambda x: " ".join([f"{el[0]}|{el[1]}" for el in x]))
 
         # Save corpus fields
         self.fields = df.columns.tolist()
@@ -306,10 +300,3 @@ class Corpus(object):
             new_list.append(d)
 
         return new_list, new_SearcheableFields
-
-
-# if __name__ == '__main__':
-#    corpus = Corpus(pathlib.Path("/Users/lbartolome/Documents/GitHub/EWB/data/source/Cordis.json"))
-#    json_lst = corpus.get_docs_raw_info()
-#    new_list = corpus.get_corpus_SearcheableField_update(["Call"], action="add")
-#    fields_dict = corpus.get_corpora_update(1)

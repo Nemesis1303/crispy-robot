@@ -37,7 +37,6 @@ q3_parser = reqparse.RequestParser()
 q3_parser.add_argument(
     'collection', help='Name of the collection', required=True)
 
-"""
 q5_parser = reqparse.RequestParser()
 q5_parser.add_argument(
     'corpus_collection', help='Name of the corpus collection', required=True)
@@ -49,7 +48,6 @@ q5_parser.add_argument(
     'start', help='Specifies an offset (by default, 0) into the responses at which Solr should begin displaying content', required=False)
 q5_parser.add_argument(
     'rows', help='Controls how many rows of responses are displayed at a time (default value: maximum number of docs in the collection)', required=False)
-"""
 
 q6_parser = reqparse.RequestParser()
 q6_parser.add_argument(
@@ -95,7 +93,6 @@ q10_parser.add_argument(
 q10_parser.add_argument(
     'rows', help='Controls how many rows of responses are displayed at a time (default value: maximum number of docs in the collection)', required=False)
 
-"""
 q14_parser = reqparse.RequestParser()
 q14_parser.add_argument(
     'corpus_collection', help='Name of the corpus collection', required=True)
@@ -107,7 +104,6 @@ q14_parser.add_argument(
     'start', help='Specifies an offset (by default, 0) into the responses at which Solr should begin displaying content', required=False)
 q14_parser.add_argument(
     'rows', help='Controls how many rows of responses are displayed at a time (default value: maximum number of docs in the collection)', required=False)
-"""
 
 q21_parser = reqparse.RequestParser()
 q21_parser.add_argument(
@@ -118,6 +114,8 @@ q21_parser.add_argument(
     'start', help='Specifies an offset (by default, 0) into the responses at which Solr should begin displaying content', required=False)
 q21_parser.add_argument(
     'rows', help='Controls how many rows of responses are displayed at a time (default value: maximum number of docs in the collection)', required=False)
+q21_parser.add_argument(
+    'sentence_transformer_model', help='Sentence transformer model to be used for embeddings', required=False, default="paraphrase-distilroberta-base-v2")
 
 
 @api.route('/getThetasDocById/')
@@ -161,7 +159,6 @@ class getNrDocsColl(Resource):
             return str(e), 500
 
 
-"""
 @api.route('/getDocsWithHighSimWithDocByid/')
 class getDocsWithHighSimWithDocByid(Resource):
     @api.doc(parser=q5_parser)
@@ -181,8 +178,7 @@ class getDocsWithHighSimWithDocByid(Resource):
                             rows=rows)
         except Exception as e:
             return str(e), 500
-"""
-
+        
 
 @api.route('/getMetadataDocById/')
 class getMetadataDocById(Resource):
@@ -273,7 +269,7 @@ class getModelInfo(Resource):
             return str(e), 500
 
 
-"""
+
 @api.route('/getDocsSimilarToFreeText/')
 class getDocsSimilarToFreeText(Resource):
     @api.doc(parser=q14_parser)
@@ -293,7 +289,6 @@ class getDocsSimilarToFreeText(Resource):
                             rows=rows)
         except Exception as e:
             return str(e), 500
-"""
 
 @api.route('/getDocsSimilarToFreeTextEmb/')
 class getDocsSimilarToFreeTextEmb(Resource):
@@ -301,6 +296,7 @@ class getDocsSimilarToFreeTextEmb(Resource):
     def get(self):
         args = q21_parser.parse_args()
         corpus_collection = args['corpus_collection']
+        embedding_model = args['sentence_transformer_model']
         doc = args['free_text']
         start = args['start']
         rows = args['rows']
@@ -308,7 +304,7 @@ class getDocsSimilarToFreeTextEmb(Resource):
             return sc.do_Q21(
                 corpus_col=corpus_collection,
                 search_doc=doc,
-                embedding_model="bert",
+                embedding_model=embedding_model,
                 start=start,
                 rows=rows
             )

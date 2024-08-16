@@ -2,11 +2,12 @@
 This script offers a basic lemmatizer that leverages the spaCy library to lemmatize a given text.
 
 Author: Lorena Calvo-Bartolomé
-Date: 07/03/2024
+Date: 15/06/2024
 """
 
 import configparser
 import logging
+from spacy_download import load_spacy
 import spacy
 
 
@@ -28,9 +29,19 @@ class Lemmatizer(object):
         cf = configparser.ConfigParser()
         cf.read(config_file)
 
-        # By default uses these but they could be configured in the config file (they need to be also downloaded from spacy. The latter is done in the Dockerfile)
-        #self._nlp_es = spacy.load("es_dep_news_trf")
-        #self._nlp_en = spacy.load("en_core_web_trf")
+        # Read models from config file
+        nlp_es = cf.get("lemmatizer", "nlp_es")
+        nlp_en = cf.get("lemmatizer", "nlp_en")
+        
+        try:
+            self._nlp_es = spacy.load(nlp_es)
+        except:
+            self._nlp_es = load_spacy(nlp_es)
+
+        try:
+            self._nlp_en = spacy.load(nlp_en)
+        except:
+            self._nlp_en = load_spacy(nlp_en)
 
     def lemmatize(
         self,

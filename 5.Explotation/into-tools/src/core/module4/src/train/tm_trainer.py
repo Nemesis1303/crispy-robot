@@ -48,6 +48,7 @@ class TMTrainer(ABC):
         num_topics: int = 20,
         topn: int = 15,
         model_path: str = None,
+        load_trained: bool = False
     ) -> None:
         """
         Initialize the TMTrainer class.
@@ -69,17 +70,19 @@ class TMTrainer(ABC):
         # Create folder for saving model
         self.model_path = pathlib.Path(
             model_path) if model_path else pathlib.Path(__file__).parent / "model"
-        if self.model_path.exists():
-            self._logger.info(
-                f"-- -- Model path {self.model_path} already exists. Saving a copy..."
-            )
-            old_model_dir = self.model_path.parent / \
-                (self.model_path.name + "_old")
-            if not old_model_dir.is_dir():
-                os.makedirs(old_model_dir)
-                shutil.move(self.model_path, old_model_dir)
+        
+        if not load_trained:
+            if self.model_path.exists():
+                self._logger.info(
+                    f"-- -- Model path {self.model_path} already exists. Saving a copy..."
+                )
+                old_model_dir = self.model_path.parent / \
+                    (self.model_path.name + "_old")
+                if not old_model_dir.is_dir():
+                    os.makedirs(old_model_dir)
+                    shutil.move(self.model_path, old_model_dir)
 
-        self.model_path.mkdir(exist_ok=True)
+            self.model_path.mkdir(exist_ok=True)
 
         # Load OpenAI API key
         try:
@@ -468,7 +471,7 @@ class MalletLDATrainer(TMTrainer):
         load_trained : bool, default=False
             If True, a message is printed indicating that no model will be trained and the inference will be performed.
         """
-        super().__init__(num_topics, topn, model_path)
+        super().__init__(num_topics, topn, model_path, load_trained)
 
         self.mallet_path = pathlib.Path(mallet_path)
         self.alpha = alpha
@@ -486,6 +489,7 @@ class MalletLDATrainer(TMTrainer):
         if load_trained:
             self._logger.info(
                 f"-- -- Model will not be trained. Inference will be performed.")
+            self.mallet_folder = self.model_path / "modelFiles"
 
     def train(self, path_to_data: str, text_col: str = "tr_tokens") -> float:
         """
@@ -664,8 +668,6 @@ class MalletLDATrainer(TMTrainer):
             Array of inferred thetas.
         """
 
-        docs, _ = super().infer(docs)
-
         path_pipe = self.mallet_folder / "import.pipe"
 
         self.inference_folder = self.model_path / "inference"
@@ -714,9 +716,8 @@ class MalletLDATrainer(TMTrainer):
 
         self._logger.info(f"-- -- Inference completed. Loading thetas...")
 
-        cols = [k for k in np.arange(2, self.num_topics + 2)]
         thetas32 = np.loadtxt(doc_topics_file, delimiter='\t',
-                              dtype=np.float32, usecols=cols)
+                              dtype=np.float32)[2:]
 
         self._logger.info(f"-- -- Inferred thetas shape {thetas32.shape}")
 
@@ -786,7 +787,7 @@ class BERTopicTrainer(TMTrainer):
             If True, the model is loaded from model_path / 'model.pickle'.
         """
 
-        super().__init__(num_topics, topn, model_path)
+        super().__init__(num_topics, topn, model_path, load_trained)
 
         self.sbert_model = sbert_model
         self.no_below = no_below

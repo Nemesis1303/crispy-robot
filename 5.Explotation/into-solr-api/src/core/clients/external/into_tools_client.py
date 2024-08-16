@@ -95,9 +95,7 @@ class IntoToolsClient(Client):
     def get_embedding(
         self,
         text_to_embed: str,
-        embedding_model: str,
-        lang: str,
-        model_for_embedding: str = None
+        sentence_transformer_model: str,
     ) -> IntoToolsResponse:
         """Get the embedding of a word using the given model.
 
@@ -105,12 +103,8 @@ class IntoToolsClient(Client):
         ----------
         word_to_embed : str
             The word to embed.
-        embedding_model : str
-            The model to use for embedding (either 'word2vec' or 'bert')
-        model_for_embedding : str
-            The model to use for embedding, i.e., the topic model on the basis of which the embeddings where generated,
-        lang : str
-            The language of the text to be lemmatized (es/en)
+        sentence_transformer_model : str
+            Sentence transformer model to be used for embeddings
 
         Returns
         -------
@@ -120,19 +114,10 @@ class IntoToolsClient(Client):
 
         headers_ = {'Accept': 'application/json'}
 
-        if model_for_embedding is None:
-            params_ = {
-                'text_to_embed': text_to_embed,
-                'embedding_model': embedding_model,
-                'lang': lang
-            }
-        else:
-            params_ = {
-                'text_to_embed': text_to_embed,
-                'embedding_model': embedding_model,
-                'model': model_for_embedding,
-                'lang': lang
-            }
+        params_ = {
+            'text_to_embed': text_to_embed,
+            'sentence_transformer_model': sentence_transformer_model,
+        }
 
         encoded_params = urlencode(params_)
 

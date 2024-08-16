@@ -380,19 +380,28 @@
     </analyzer>
   </fieldType>
 
+  <fieldType name="VectorStringField" class="solr.TextField" indexed="true" termOffsets="true"
+  stored="true" termPayloads="true" termPositions="true" termVectors="true"
+  storeOffsetsWithPositions="true">
+  <analyzer>
+    <tokenizer class="solr.WhitespaceTokenizerFactory" />
+    <filter class="solr.DelimitedPayloadTokenFilterFactory" encoder="string" />
+  </analyzer>
+  </fieldType>
+
   <fieldType name="knn_vector" class="solr.DenseVectorField" vectorDimension="768" similarityFunction="cosine"/>
 
-  <field name="betas" type="VectorField" indexed="true" termOffsets="true" stored="true"
-    termPositions="true" termVectors="true" multiValued="false" />
+  <field name="betas" type="VectorField" indexed="true" termOffsets="true" stored="true" termPositions="true" termVectors="true" multiValued="false" />
 
-  <field name="top_words_betas" type="VectorFloatField" indexed="true" termOffsets="true" stored="true"
-    termPositions="true" termVectors="true" multiValued="false" />
+  <field name="top_words_betas" type="VectorFloatField" indexed="true" termOffsets="true" stored="true" termPositions="true" termVectors="true" multiValued="false" />
 
-  <field name="bow" type="VectorField" indexed="true" termOffsets="true" stored="true"
-    termPositions="true" termVectors="true" multiValued="false" />
+  <field name="raw_text_GEN_NERS" type="VectorStringField" indexed="true" termOffsets="true" stored="true" termPositions="true" termVectors="true" multiValued="false" />
 
-  <field name="userRelevantTopics" type="VectorField" indexed="true" termOffsets="true" stored="true"
-    termPositions="true" termVectors="true" multiValued="false" />
+  <field name="raw_text_SPEC_NERS" type="VectorStringField" indexed="true" termOffsets="true" stored="true" termPositions="true" termVectors="true" multiValued="false" />
+
+  <field name="summary_GEN_NERS" type="VectorStringField" indexed="true" termOffsets="true" stored="true" termPositions="true" termVectors="true" multiValued="false" />
+
+  <field name="summary_SPEC_NERS" type="VectorStringField" indexed="true" termOffsets="true" stored="true" termPositions="true" termVectors="true" multiValued="false" />
 
   <!-- <fieldType name="text_tfdl" class="solr.TextField" omitPositions="true" >
       <analyzer>

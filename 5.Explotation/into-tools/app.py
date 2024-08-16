@@ -16,7 +16,7 @@ app.config["RESTX_MASK_SWAGGER"] = False
 api.init_app(app)
 
 if __name__ == '__main__':
-    cprint(figlet_format("NP Tools API",
+    cprint(figlet_format("INTO Tools API",
            font='big'), 'blue', attrs=['bold'])
     print('\n')    
     

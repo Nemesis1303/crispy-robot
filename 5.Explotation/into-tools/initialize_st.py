@@ -11,7 +11,6 @@ def main():
     # Generate embeddings
     embeddings = embedder_manager.infer_embeddings(
         embed_from=text_to_embed,
-        method="bert",
     )
     
     logger.info(f"-- -- Embeddings generated successfully: {embeddings}")

@@ -2,7 +2,7 @@
 This script defines a Flask RESTful namespace for performing inference.
 
 Author: Lorena Calvo-Bartolomé
-Date: 13/08/2024
+Date: 15/08/2024
 """
 
 import os

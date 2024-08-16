@@ -53,8 +53,8 @@ RUN mkdir -p /data/source
 
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install "dask[complete]"
-#RUN python -m spacy download es_dep_news_trf
-#RUN python -m spacy download en_core_web_trf
+RUN python -m spacy download es_core_news_md
+RUN python -m spacy download en_core_web_md
 
 # Clone the Mallet repository and build it
 RUN mkdir -p /app && \
@@ -66,7 +66,7 @@ RUN mkdir -p /app && \
 WORKDIR /into-tools
 
 # Download and cache the sentence transformer model
-ARG MODEL_NAME=sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+ARG MODEL_NAME=paraphrase-distilroberta-base-v2
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('${MODEL_NAME}')"
 RUN python initialize_st.py
 

@@ -35,4 +35,5 @@ python-dotenv
 openai
 pyLDAvis==3.4.1
 sentence_transformers
+spacy_download
 #cuml

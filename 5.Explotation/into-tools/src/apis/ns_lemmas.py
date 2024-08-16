@@ -2,7 +2,7 @@
 This script defines a Flask RESTful namespace for performing lemmatization operations.
 
 Author: Lorena Calvo-Bartolomé
-Date: 03/04/2024
+Date: 15/08/2024
 """
 
 import logging
