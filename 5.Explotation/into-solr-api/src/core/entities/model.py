@@ -86,7 +86,7 @@ class Model(object):
             # read the data from the file and convert it back to a list of tuples
             self.coords = [tuple(map(float, line.strip()[1:-1].split(', '))) for line in fin]
         with self.path_to_model.joinpath('tpc_descriptions.txt').open('r', encoding='utf8') as fin:
-                self.tpc_descriptions = [el.strip() for el in fin.readlines()]
+                self.tpc_descriptions = [",".join(el.strip().split()) for el in fin.readlines()]
         with self.path_to_model.joinpath('tpc_labels.txt').open('r', encoding='utf8') as fin:
                 self.tpc_labels = [el.strip() for el in fin.readlines()]
         data = {

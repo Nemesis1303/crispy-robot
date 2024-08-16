@@ -932,7 +932,8 @@ class BERTopicTrainer(TMTrainer):
         keys = []
         for k, v in self._model.get_topics().items():
             keys.append([el[0] for el in v])
-
+        keys = keys[1:]
+        
         model_file = self.model_path.joinpath('model.pickle')
         pickler(model_file, self._model)
 
