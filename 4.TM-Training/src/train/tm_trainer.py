@@ -477,7 +477,7 @@ class MalletLDATrainer(TMTrainer):
         load_trained : bool, default=False
             If True, a message is printed indicating that no model will be trained and the inference will be performed.
         """
-        super().__init__(num_topics, topn, model_path)
+        super().__init__(num_topics, topn, model_path, load_trained)
 
         self.mallet_path = pathlib.Path(mallet_path)
         self.alpha = alpha
@@ -794,7 +794,7 @@ class BERTopicTrainer(TMTrainer):
             If True, the model is loaded from model_path / 'model.pickle'.
         """
 
-        super().__init__(num_topics, topn, model_path)
+        super().__init__(num_topics, topn, model_path, load_trained)
 
         self.sbert_model = sbert_model
         self.no_below = no_below

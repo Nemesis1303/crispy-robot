@@ -31,16 +31,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Download and install Python 3.11.1
-RUN wget https://www.python.org/ftp/python/3.11.1/Python-3.11.1.tgz && \
-    tar xzf Python-3.11.1.tgz && \
-    cd Python-3.11.1 && \
+# Download and install Python 3.10.11
+RUN wget https://www.python.org/ftp/python/3.10.11/Python-3.10.11.tgz && \
+    tar xzf Python-3.10.11.tgz && \
+    cd Python-3.10.11 && \
     ./configure --enable-optimizations && \
     make altinstall && \
-    ln -s /usr/local/bin/python3.11 /usr/local/bin/python && \
-    ln -s /usr/local/bin/pip3.11 /usr/local/bin/pip && \
+    ln -s /usr/local/bin/python3.10 /usr/local/bin/python && \
+    ln -s /usr/local/bin/pip3.10 /usr/local/bin/pip && \
     cd .. && \
-    rm -rf Python-3.11.1.tgz Python-3.11.1
+    rm -rf Python-3.10.11.tgz Python-3.10.11
 
 # Install other necessary dependencies
 RUN apt-get update && apt-get install hunspell-es

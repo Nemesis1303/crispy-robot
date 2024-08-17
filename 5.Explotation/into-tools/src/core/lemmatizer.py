@@ -2,7 +2,7 @@
 This script offers a basic lemmatizer that leverages the spaCy library to lemmatize a given text.
 
 Author: Lorena Calvo-Bartolomé
-Date: 15/06/2024
+Date: 15/08/2024
 """
 
 import configparser

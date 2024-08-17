@@ -3,7 +3,7 @@ This module provides a specific class for handeling the Solr API responses and r
 
 Author: Lorena Calvo-Bartolomé
 Date: 17/04/2023
-Modifed: 15/08/2024 (Updated for Into-Solr-Service (IntoKnow Proyect))
+Modifed: 15/08/2024 (Updated for Into-Solr-Service (IntoKnown Proyect))
 """
 
 import configparser

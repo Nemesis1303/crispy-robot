@@ -9,7 +9,7 @@ The SolrClient class is for handling Solr API requests.
 
 Author: Lorena Calvo-Bartolomé
 Date: 27/03/2023
-Modifed: 24/01/2024 (Updated for NP-Solr-Service (NextProcurement Proyect))
+Modifed: 15/08/2024 (Updated for Into-Solr-Service (IntoKnow Proyect))
 """
 
 import json

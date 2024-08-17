@@ -2,7 +2,7 @@
 This script offers an Embedder class that provides methods for generating embeddings for a given list of sentences or words using a SBERT model. It also provides a method for creating SBERT embeddings for each row in a dask or pandas dataframe and saving the embeddings in a new column.
 
 Author: Lorena Calvo-Bartolomé
-Date: 15/06/2024
+Date: 15/08/2024
 """
 
 import logging

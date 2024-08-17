@@ -3,6 +3,7 @@ This module is a class implementation to manage and hold all the information ass
 
 Author: Lorena Calvo-Bartolomé
 Date: 28/03/2024
+Modifed: 15/08/2024 (Updated for Into-Solr-Service (IntoKnown Proyect))
 """
 
 
@@ -116,13 +117,19 @@ class Model(object):
 
         # Get model information as dataframe, where each row is a topic
         df, vocab_id2w, vocab = self.df, self.vocab_id2w, self.vocab
+        
         df = df.apply(pd.Series.explode)
+        
+        self._logger.info(f"-- -- Exploded df: {df.head()}")
+        
         df.reset_index(drop=True)
         df["id"] = [f"t{i}" for i in range(len(df))]
 
         cols = df.columns.tolist()
         cols = cols[-1:] + cols[:-1]
         df = df[cols]
+        
+        self._logger.info(f"-- -- Columns of df: {df.columns.tolist()}")
 
         # Get betas scale to self.max_sum
         def get_betas_scale(vector: np.array,
@@ -132,6 +139,8 @@ class Model(object):
 
         df["betas_scale"] = df["betas"].apply(
             lambda x: get_betas_scale(x, self.betas_max_sum))
+        
+        self._logger.info(f"-- -- Betas scale obtained")
 
         # Get words in each topic
         def get_tp_words(vector: np.array,
@@ -140,6 +149,8 @@ class Model(object):
 
         df["vocab"] = df["betas"].apply(
             lambda x: get_tp_words(x, vocab_id2w))
+        
+        self._logger.info(f"-- -- Words in each topic obtained")
 
         # Get betas string representation
         def get_tp_str_rpr(vector: np.array,
@@ -150,6 +161,8 @@ class Model(object):
 
         df["betas"] = df["betas_scale"].apply(
             lambda x: get_tp_str_rpr(x, vocab_id2w))
+        
+        self._logger.info(f"-- -- Betas string representation obtained")
 
         def get_top_words_betas(row, vocab, n_words=15):
             # a row is a topic
@@ -167,15 +180,24 @@ class Model(object):
 
         df['top_words_betas'] = df.apply(
             lambda row: get_top_words_betas(row, vocab), axis=1)
+        
+        self._logger.info(f"-- -- Top words in betas obtained")
 
         # Drop betas scale because it is not needed
         df = df.drop(columns=["betas_scale", "betas_ds"])
 
         # Get topic coordinates in cluster space
         df["coords"] = self.coords
+        
+        self._logger.info(f"-- -- Topic coordinates obtained")
 
         json_str = df.to_json(orient='records')
         json_lst = json.loads(json_str)
+        
+        self._logger.info(f"-- -- Model information obtained")
+        # Save json list in a JSON file
+        with open(self.path_to_model.joinpath("model_info.json"), 'w') as file:
+            json.dump(json_lst, file)
 
         return json_lst
 

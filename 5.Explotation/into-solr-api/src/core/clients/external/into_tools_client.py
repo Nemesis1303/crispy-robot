@@ -4,7 +4,7 @@ This  module provides 2 classes to handle Into Tools API responses and requests.
 The IntoToolsResponse class handles Into Tools API response and errors, while the IntoToolsClient class handles requests to the Into Tools API.
 
 Author: Lorena Calvo-Bartolomé
-Date: 15/08/2023
+Date: 15/08/2024
 """
 
 import logging

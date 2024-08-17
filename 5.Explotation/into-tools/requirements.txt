@@ -22,7 +22,7 @@ termcolor==2.2.0
 waitress==2.1.2
 spacy
 gensim
-bertopic
+bertopic==0.16.2
 hdbscan
 matplotlib
 numpy
@@ -34,6 +34,6 @@ scipy==1.12
 python-dotenv
 openai
 pyLDAvis==3.4.1
-sentence_transformers
+sentence-transformers==3.0.1
 spacy_download
 #cuml

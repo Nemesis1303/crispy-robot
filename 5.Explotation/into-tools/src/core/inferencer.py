@@ -2,7 +2,7 @@
 This module provides the class Inferencer, which consists of a wrapper for perfoming inference on a new unseen corpus. It contains specific implementations according to the trainer used for the generation of the topic model that is being used for inference. It is based in the inference process of module 4.TM-Training.
 
 Author: Lorena Calvo-Bartolomé
-Date: 13/08/2024
+Date: 15/08/2024
 """
 
 import logging

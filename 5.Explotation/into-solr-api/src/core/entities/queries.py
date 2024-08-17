@@ -1,9 +1,9 @@
 """
-This module defines a class with the EWB-specific queries used to interact with Solr.
-
+This module defines a class with the IntoKnown-specific queries used to interact with Solr.
 
 Author: Lorena Calvo-Bartolomé
 Date: 19/04/2023
+Modifed: 15/08/2024 (Updated for Into-Solr-Service (IntoKnown Proyect))
 """
 
 
@@ -161,8 +161,6 @@ class Queries(object):
             'start': '{}',
             'rows': '{}'
         }
-
-        # If adding a new one, start numberation at 20
         
         # # Q21: getDocsSimilarToFreeTextEmb
         # # Retrieve documents that are semantically similar to a given free text using BERT embeddings. The free text is represented by its BERT embeddings, and these embeddings for the documents in the collection are precalculated and indexed into Solr for efficient retrieval.

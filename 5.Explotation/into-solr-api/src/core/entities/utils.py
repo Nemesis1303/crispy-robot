@@ -3,7 +3,7 @@ This module contains some auxiliary function for the management of NP backend's 
 
 Author: Lorena Calvo-Bartolomé
 Date: 12/04/2023
-Modifed: 24/01/2024 (Updated for NP-Solr-Service (NextProcurement Proyect))
+Modifed: 15/08/2024 (Updated for Into-Solr-Service (IntoKnown Proyect))
 """
 
 
@@ -85,12 +85,26 @@ def sum_up_to(
     x: np.ndarray
         A NumPy array of the same shape as vector but with the values adjusted such that their sum is equal to max_sum.
     """
-    x = np.array(list(map(np.int_, vector*max_sum))).ravel()
-    pos_idx = list(np.where(x != 0)[0])
-    while np.sum(x) != max_sum:
+    x = np.array(list(map(np.int_, vector * max_sum))).ravel()
+    pos_idx = list(np.where(x > 0)[0])
+    current_sum = np.sum(x)
+    difference = max_sum - current_sum
+    
+    while difference != 0:
         idx = random.choice(pos_idx)
-        if x[idx] > 0:
-            x[idx] += 1
+        
+        # Determine the adjustment direction based on the difference
+        adjust = np.sign(difference)
+        
+        # Only adjust if it won't cause the value to go negative
+        if x[idx] + adjust >= 0:
+            x[idx] += adjust
+            difference -= adjust
+        
+        # If no positive adjustments can be made, break out to prevent infinite loop
+        if adjust > 0 and all(x[pos_idx] >= 0):
+            break
+        
     return x
 
 
