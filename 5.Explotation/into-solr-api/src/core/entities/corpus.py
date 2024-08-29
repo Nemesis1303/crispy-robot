@@ -68,6 +68,8 @@ class Corpus(object):
             section, "MetadataDisplayed").split(",")
         self.SearcheableField = cf.get(section, "SearcheableField").split(",")
         self.EmbeddingsToIndex = cf.get(section, "EmbeddingsToIndex", fallback="").split(",")
+        if self.EmbeddingsToIndex == ['']:
+            self.EmbeddingsToIndex = None
         
         return
 
