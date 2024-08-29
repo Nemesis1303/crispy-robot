@@ -182,9 +182,9 @@ class Corpus(object):
                     lastCol = col
                     df[col] = df[col].apply(lambda x: [float(val) for _, val in enumerate(x.split())])
         
-        if col != "":
+        if lastCol != "":
             self._logger.info(f"-- -- Embeddings calculated OK for {lastCol}.")
-        self._logger.info(f"-- -- The embeddings for {lastCol} look like this: {df.iloc[0][lastCol]}")
+            self._logger.info(f"-- -- The embeddings for {lastCol} look like this: {df.iloc[0][lastCol]}")
 
         # Convert dates information to the format required by Solr ( ISO_INSTANT, The ISO instant formatter that formats or parses an instant in UTC, such as '2011-12-03T10:15:30Z')
         df, cols = convert_datetime_to_strftime(df)

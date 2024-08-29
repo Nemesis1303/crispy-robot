@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 from dask.diagnostics import ProgressBar
 from src.core.entities.utils import calculate_beta_ds, process_line, sum_up_to
-# from utils import sum_up_to
+#from utils import calculate_beta_ds, process_line, sum_up_to
 
 
 class Model(object):
@@ -90,6 +90,13 @@ class Model(object):
                 self.tpc_descriptions = [",".join(el.strip().split()) for el in fin.readlines()]
         with self.path_to_model.joinpath('tpc_labels.txt').open('r', encoding='utf8') as fin:
                 self.tpc_labels = [el.strip() for el in fin.readlines()]
+        if len(self.tpc_labels) < len(self.betas):
+            diff = len(self.betas) - len(self.tpc_labels)
+            for el in range(diff):
+                label = "Topic " + str(el + len(self.tpc_labels))
+                self.tpc_labels.append(label)
+        
+        """
         data = {
             "betas": [self.betas],
             "betas_ds": [self.betas_ds],
@@ -101,9 +108,14 @@ class Model(object):
             "tpc_labels": [self.tpc_labels],
         }
         self.df = pd.DataFrame(data)
-        
-        self._logger.info(self.df)
+        self.df.reset_index(drop=True, inplace=True) 
 
+        import pdb; pdb.set_trace()
+        """
+        rows = list(zip(self.betas, self.betas_ds, self.alphas, self.ndocs_active, self.tpc_descriptions, self.tpc_labels))
+        self.df = pd.DataFrame(rows, columns=["betas", "betas_ds", "alphas", "ndocs_active", "tpc_descriptions", "tpc_labels"])
+        self._logger.info(self.df)
+        
         return
 
     def get_model_info(self) -> List[dict]:
@@ -118,9 +130,9 @@ class Model(object):
         # Get model information as dataframe, where each row is a topic
         df, vocab_id2w, vocab = self.df, self.vocab_id2w, self.vocab
         
+        """
         df = df.apply(pd.Series.explode)
-        
-        self._logger.info(f"-- -- Exploded df: {df.head()}")
+        """
         
         df.reset_index(drop=True)
         df["id"] = [f"t{i}" for i in range(len(df))]
@@ -341,14 +353,15 @@ class Model(object):
 
         return json_lst
 
-
-# if __name__ == '__main__':
-#    model = Model(pathlib.Path(
+"""
+if __name__ == '__main__':
+    model = Model(pathlib.Path("/home/sblanco/crispy-robot/5.Explotation/data/source/modulo3_mallet"))
 #       "/export/data_ml4ds/IntelComp/EWB/data/source/HFRI-30"))
     # json_lst = model.get_model_info_update(action='set')
     # pos = model.get_topic_pos()
     # print(json_lst[0])
-#    df = model.get_model_info()
+    df = model.get_model_info()
     # print(df[0].keys())
     # upt = model.get_corpora_model_update()
     # print(upt)
+"""

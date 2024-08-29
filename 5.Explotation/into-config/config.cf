@@ -31,7 +31,7 @@ nlp_en=en_core_web_md
 [modulo11-config]
 MetadataDisplayed=summary
 SearcheableField=summary
-EmbeddingsToIndex=raw_text,summary
+#EmbeddingsToIndex=raw_text,summary
 
 [data_mod3_kumo01-config]
 MetadataDisplayed=summary,date
