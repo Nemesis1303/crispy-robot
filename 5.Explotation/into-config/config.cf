@@ -28,10 +28,10 @@ nlp_es=es_core_news_md
 nlp_en=en_core_web_md
 
 # There will be one of this for each corpus avaialable
-[modulo1-config]
-MetadataDisplayed=summary,date
+[modulo11-config]
+MetadataDisplayed=summary
 SearcheableField=summary
-EmbeddingsToIndex=raw_text_EMBEDDINGS,summary_EMBEDDINGS
+EmbeddingsToIndex=raw_text,summary
 
 [data_mod3_kumo01-config]
 MetadataDisplayed=summary,date
