@@ -209,7 +209,7 @@ class NLPpipeline(object):
                     acronym_pattern = r'\b{}\b'.format(acronym)
                     acronyms_list.append((acronym_pattern, full_form))
                 except Exception as e:
-                    self._logger.error(
+                    self._logger.warning(
                         f"-- -- Acronym tuple could not be added to the acronyms list: {e}")
 
             # Remove duplicates if any
