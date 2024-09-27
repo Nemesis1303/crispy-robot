@@ -15,7 +15,7 @@ from langchain_community.document_loaders import PyMuPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from llama_index.llms.huggingface import HuggingFaceLLM
 from llama_index.llms.openai import OpenAI
-from llama_index.core import ServiceContext
+from llama_index.core import Settings
 from src.utils import messages_to_prompt, completion_to_prompt
 
 
@@ -45,13 +45,9 @@ class Summarizer(object):
             """
 
         if model_type == "openai":
-            llm=OpenAI(
+            Settings.llm = OpenAI(
                 temperature=temperature,
                 model=model_name)
-            self._service_context = ServiceContext.from_defaults(
-                llm=llm,
-                chunk_size=chunk_size,
-            )
             self._logger.info(f"-- Using OpenAI model {model_name}")
         elif model_type == "hf":
             llm = HuggingFaceLLM(
@@ -61,21 +57,10 @@ class Summarizer(object):
                 completion_to_prompt=completion_to_prompt,
                 device_map="auto",
             )
-            self._service_context = ServiceContext.from_defaults(
-                llm=llm,
-                chunk_size=chunk_size,
-                embed_model="local"
-            )
+            Settings.llm = llm
             self._logger.info(f"-- Using HuggingFace model {model_name}")
         else:
             raise ValueError(f"Model type {model_type} not recognized")
-            
-        # Set up service context
-        self._service_context = ServiceContext.from_defaults(
-            llm=llm,
-            chunk_size=chunk_size,
-            embed_model="local"
-        )
 
     def _get_llama_docs(
         self,
@@ -157,7 +142,7 @@ class Summarizer(object):
         docs = self._get_llama_docs(pdf_file)
 
         # Build Llama index
-        index = VectorStoreIndex.from_documents(docs, service_context=self._service_context)
+        index = VectorStoreIndex.from_documents(docs)
 
         query_engine = index.as_query_engine()
 

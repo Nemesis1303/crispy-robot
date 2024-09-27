@@ -72,19 +72,23 @@ from tqdm import tqdm
 class PDFParser(object):
     def __init__(
         self,
+        extract_header_footer: bool = True,
         generate_img_desc: bool = False,
         generate_table_desc: bool = False,
         header_weights: list = [1.0, 0.75, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
         footer_weights: list = [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.75, 1.0],
         win: int = 8,
         footer_marging: int = 50,
-        header_marging: int = 50
+        header_marging: int = 50,
+        remove_next_line: bool = True
     ) -> None:
         """
         Initialize the PDFParser object.
 
         Parameters
         ----------
+        extract_header_footer : bool, optional
+            Whether to extract the header and footer from the PDF, by default True
         generate_img_desc : bool, optional
             Whether to generate a description for the images in the PDF, by default False
         generate_table_desc : bool, optional
@@ -99,6 +103,8 @@ class PDFParser(object):
             The margin to consider for the footer extraction when PyMuPDF's  multi_column.py utility is used, by default 50
         header_marging : int, optional
             The margin to consider for the header extraction when PyMuPDF's  multi_column.py utility is used, by default 50
+        remove_next_line : bool, optional
+            Whether to remove the next line character from the text, by default True
         """
 
         # Create a logger
@@ -118,6 +124,7 @@ class PDFParser(object):
             )
 
         # Initialize the variables
+        self._extract_header_footer = extract_header_footer
         self._generate_img_desc = generate_img_desc
         self._generate_table_desc = generate_table_desc
         self._header_weights = header_weights
@@ -127,6 +134,7 @@ class PDFParser(object):
         self._header_marging = header_marging
         self._table_counter = 0
         self._img_counter = 0
+        self._remove_next_line = remove_next_line
 
     # ======================================================
     # HEADER / FOOTER EXTRACTION
@@ -258,7 +266,7 @@ class PDFParser(object):
     # ======================================================
     def _parse_text(
         self,
-        text: str
+        text: str,
     ) -> str:
         """
         Parse the text extracted from the PDF in order to make it more readable.
@@ -275,14 +283,18 @@ class PDFParser(object):
         """
 
         text_formatted = re.sub(' +', ' ', text).strip()
+        
+        # Remove \n
+        if self._remove_next_line:
+            text_formatted = text_formatted.replace('\n', ' ')
 
         # Remove header and footer from the text
         for el in self._header + self._footer:
-            text = text.replace(
+            text_formatted = text_formatted.replace(
                 el, "").replace('-', '–').replace(el, "")
 
-        if text == ".":
-            text = ""
+        if text_formatted == ".":
+            text_formatted = ""
 
         return text_formatted
 
@@ -681,13 +693,17 @@ class PDFParser(object):
         pages = fitz.open(pdf_path)
         pages_ = [self._extract_text_from_page(page) for page in pages]
 
+        if self._extract_header_footer:
         # Get the header and footer candidates
-        header_candidates = [page[:self._win] for page in pages_]
-        footer_candidates = [page[-self._win:] for page in pages_]
+            header_candidates = [page[:self._win] for page in pages_]
+            footer_candidates = [page[-self._win:] for page in pages_]
 
-        # Extract the header and footer from the header and footer candidates
-        self._header = self._extract_header(header_candidates)
-        self._footer = self._extract_footer(footer_candidates)
+            # Extract the header and footer from the header and footer candidates
+            self._header = self._extract_header(header_candidates)
+            self._footer = self._extract_footer(footer_candidates)
+        else:
+            self._header = []
+            self._footer = []
 
         ########################################################################
         # 3. Extract the content from the PDF
@@ -706,7 +722,7 @@ class PDFParser(object):
 
         # Iterate through each page. We keep objects from fitz and pypdf2 to extract so both content (including multicolumns) and tables/images can be extracted
         for pagenum, (page_fitz, page_pypdf2) in enumerate(zip(pages, extract_pages(pdf_path))):
-
+            
             # Reset the table and image counters at the beginning of each page
             self._table_counter = 0
             self._img_counter = 0
@@ -735,10 +751,11 @@ class PDFParser(object):
             tables = page_tables.find_tables()
             if len(tables) != 0:
                 table_in_page = 0
+                self._logger.info(f"-- Extracting tables from page {pagenum}...")
+            else:
+                self._logger.info(f"-- No tables found in page {pagenum}.")
 
             # Extracting the tables of the page
-            self._logger.info(
-                f"-- Extracting tables from page {pagenum}...")
             for i_table in tqdm(range(len(tables))):
 
                 # Extract the information of the table
@@ -751,30 +768,35 @@ class PDFParser(object):
                 text_from_tables.append(table_string)
                 path_tables.append(table_output_save)
                 description_tables.append(description)
-
-            self._logger.info(
-                f"-- Table extraction from page {pagenum} finished...")
+                
+                if i_table == len(tables) - 1:
+                    self._logger.info(
+                        f"-- Table extraction from page {pagenum} finished...")
 
             # Find all the elements and sort them as they appear in the page
-            page_elements = [(element.y1, element)
-                             for element in page_pypdf2._objs]
+            page_elements = [(element.y1, element) for element in page_pypdf2._objs]
             page_elements.sort(key=lambda a: a[0], reverse=True)
 
             # Extract text content from the page with the multi_column utility
             # We remove the tables from the page content
-            [page_fitz.add_redact_annot(table.bbox)
-             for table in page_fitz.find_tables()]
+            if table_in_page != -1:
+                [page_fitz.add_redact_annot(table.bbox) for table in page_fitz.find_tables()]
             page_fitz.apply_redactions()
 
-            # Extract the text from the columns
-            bboxes = column_boxes(
-                page_fitz, footer_margin=self._footer_marging, no_image_text=True)
+            # Extract columns (if any)
+            bboxes = column_boxes(page_fitz, footer_margin=self._footer_marging, no_image_text=True)
 
-            # Concatenate the text from the columns and parse it
-            extracted_text_fitz = ''.join(
-                [page_fitz.get_text(clip=rect, sort=True) for rect in bboxes])
+            # If columns, concatenate the text from the columns
+            if len(bboxes) > 1:
+                self._logger.info(f"-- Columns found in page {pagenum}...")
+                extracted_text_fitz = ''.join([page_fitz.get_text(clip=rect, sort=True) for rect in bboxes])
+            else:
+                # If no columns, extract the text from the page
+                self._logger.info(f"-- No columns found in page {pagenum}...")
+                extracted_text_fitz = page_fitz.get_text()
+
             extracted_text_fitz = self._parse_text(extracted_text_fitz)
-
+            
             # Append the text of each line to the page text as one 'text' element
             this_page_content.append(
                 {

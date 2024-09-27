@@ -23,7 +23,7 @@ if __name__ == "__main__":
     #import ipdb ; ipdb.set_trace()
     #exit()
 
-    process = processPDF ( args.indir, args.outdir, int(args.workers))
+    process = processPDF (args.indir, args.outdir, int(args.workers))
 
     now = datetime.now()
     start_time = time.time()
