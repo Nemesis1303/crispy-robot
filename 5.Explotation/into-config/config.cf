@@ -28,7 +28,7 @@ nlp_es=es_core_news_md
 nlp_en=en_core_web_md
 
 # There will be one of this for each corpus avaialable
-[modulo11-config]
+[modulo1-config]
 MetadataDisplayed=summary
 SearcheableField=summary
 #EmbeddingsToIndex=raw_text,summary
@@ -37,3 +37,9 @@ SearcheableField=summary
 MetadataDisplayed=summary,date
 SearcheableField=summary
 EmbeddingsToIndex=raw_text_EMBEDDINGS,summary_EMBEDDINGS
+
+
+[modulo3_casos_medicos-config]
+MetadataDisplayed=summary
+SearcheableField=summary
+EmbeddingsToIndex=raw_text_EMBEDDINGS

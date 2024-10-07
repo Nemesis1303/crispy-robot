@@ -12,30 +12,29 @@ from typing import List
 from abc import ABC, abstractmethod
 import warnings
 
-from dotenv import load_dotenv
 import numpy as np
 import pandas as pd
 import yaml
-from gensim.corpora import Dictionary
+#from gensim.corpora import Dictionary
 from scipy import sparse
 from sklearn.preprocessing import normalize
-import matplotlib.pyplot as plt
-from sentence_transformers import SentenceTransformer
+#import matplotlib.pyplot as plt
+#from sentence_transformers import SentenceTransformer
 #from cuml.manifold import UMAP
-from hdbscan import HDBSCAN
-from bertopic import BERTopic
-from sklearn.feature_extraction.text import CountVectorizer
-from bertopic.representation import KeyBERTInspired, MaximalMarginalRelevance
-from bertopic.vectorizers import ClassTfidfTransformer
+#from hdbscan import HDBSCAN
+#from bertopic import BERTopic
+#from sklearn.feature_extraction.text import CountVectorizer
+#from bertopic.representation import KeyBERTInspired, MaximalMarginalRelevance
+#from bertopic.vectorizers import ClassTfidfTransformer
 #from sparse_dot_topn import awesome_cossim_topn
 #from scipy.sparse import lil_matrix, csr_matrix
-with warnings.catch_warnings():
-    warnings.filterwarnings("ignore", category=DeprecationWarning)
-    import pyLDAvis
+#with warnings.catch_warnings():
+#    warnings.filterwarnings("ignore", category=DeprecationWarning)
+#    import pyLDAvis
 
 
 from src.core.module4.src.utils.utils import file_lines, get_embeddings_from_str, pickler, unpickler
-from src.core.module4.src.train.topic_labeller import TopicLabeller
+#from src.core.module4.src.train.topic_labeller import TopicLabeller
 
 
 class TMTrainer(ABC):

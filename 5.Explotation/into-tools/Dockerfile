@@ -1,6 +1,7 @@
 
 # Use official ubuntu image with CUDA support
-FROM nvidia/cuda:11.6.2-base-ubuntu20.04
+#FROM nvidia/cuda:11.6.2-base-ubuntu20.04
+FROM nvidia/cuda:12.6.1-cudnn-devel-ubuntu20.04
 
 # Set environment variables
 ENV TZ=Europe/Madrid
