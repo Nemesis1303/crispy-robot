@@ -127,7 +127,7 @@ class TopicLabeller(object):
             for labels_chunk in chunked_list:
                 gpt_prompt = f"Give me a label for each of the following set of words and return it as a Python list with the labels: {labels_chunk}"
                 print(gpt_prompt)
-                aux = self._promt(gpt_prompt)
+                aux = self._promt(gpt_prompt).replace("'","")
                 print(aux)
                 aux_eval = eval(aux)
                 print(aux_eval)

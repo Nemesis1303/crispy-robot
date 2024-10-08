@@ -317,8 +317,15 @@ class TMTrainer(ABC):
         tl = TopicLabeller(openai_api_key=self._api_key)
 
         # Get labels
-        labels = tl.get_labels(tpc_descriptions)
-        labels_format = [p for _, p in enumerate(labels)]
+        #labels = tl.get_labels(tpc_descriptions)
+        #labels_format = [p for _, p in enumerate(labels)
+        try:
+            labels = tl.get_labels(tpc_descriptions)
+            labels_format = [p for _, p in enumerate(labels)]
+        except Exception as e: 
+            print("-- -- Something failed with openai. Generating generic labels...")
+            labels = [f"Topic {str(el)}" for el in range(len(tpc_descriptions))]
+
 
         return labels_format
 
