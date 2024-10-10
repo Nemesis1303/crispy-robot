@@ -41,6 +41,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-i', '--indir', help='Input directory name', required=True)
     parser.add_argument('-p', '--outfile', help='parquet file to save', required=True)
+    parser.add_argument('-e',action='store_true',help='Does not delete documents with a blank summary')
     args = parser.parse_args()
 
     ignoreFiles = ['default__vector_store.json', 'image__vector_store.json', 
@@ -50,7 +51,11 @@ if __name__ == "__main__":
 
     listJsons = getDataFiles (args.indir)
     allData = [getFileData (file) for file in listJsons if os.path.basename(file) not in ignoreFiles]
-    allData = [data for data in allData if data['summary'] != ""]
+    if args.e:
+        print ('Blank summaries will not be removed')
+    else:
+        print ('Deleting blank summaries.')
+        allData = [data for data in allData if data['summary'] != ""]
 
     df = pd.DataFrame.from_dict(allData)
     df = df.reset_index()
