@@ -67,7 +67,7 @@ from src.image_descriptor import ImageDescriptor
 from src.multi_column import column_boxes
 from src.utils import compare
 from tqdm import tqdm
-
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 
 class PDFParser(object):
     def __init__(
@@ -404,7 +404,7 @@ class PDFParser(object):
             row = table[row_num]
             # Remove the line breaker from the wrapted texts
             cleaned_row = [
-                (item.replace("\n", " ")).strip()
+                re.sub(ILLEGAL_CHARACTERS_RE, '',(item.replace("\n", " ")).strip())
                 if item is not None
                 else ""
                 if item is None
